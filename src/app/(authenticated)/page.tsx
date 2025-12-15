@@ -354,7 +354,6 @@ export default function HomePage() {
           nome: data.nome || "",
           professor_id: data.professor_id || null,
           treinador_corrida_id: data.treinador_corrida_id || null,
-          treinador_corrida_id: data.treinador_corrida_id || null,
           plano: data.plano || "PRO",
           ambiente: data.ambiente || "Academia",
           dias_treina: data.dias_treina || 3,
