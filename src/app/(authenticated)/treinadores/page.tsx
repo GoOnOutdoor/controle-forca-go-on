@@ -28,8 +28,11 @@ import {
 } from "@/lib/api";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useUser } from "@clerk/nextjs";
+import { isMasterEmail } from "@/lib/permissions";
 
 export default function TreinadoresPage() {
+  const { user, isLoaded } = useUser();
   const [treinadores, setTreinadores] = useState<Treinador[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -51,6 +54,62 @@ export default function TreinadoresPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const userEmail =
+    user?.primaryEmailAddress?.emailAddress?.toLowerCase() ||
+    user?.emailAddresses?.[0]?.emailAddress?.toLowerCase() ||
+    null;
+  const isMaster = isMasterEmail(userEmail);
+
+  if (!isLoaded || loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-7 w-40" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-9 w-28" />
+            <Skeleton className="h-9 w-32" />
+          </div>
+        </div>
+        <div className="rounded-md border overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {Array.from({ length: 4 }).map((_, idx) => (
+                  <TableHead key={idx}>
+                    <Skeleton className="h-4 w-24" />
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Array.from({ length: 4 }).map((_, idx) => (
+                <TableRow key={idx}>
+                  {Array.from({ length: 4 }).map((__, cellIdx) => (
+                    <TableCell key={cellIdx}>
+                      <Skeleton className="h-4 w-full" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isMaster) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold">Treinadores</h1>
+        <p className="text-muted-foreground">Você não tem permissão para acessar esta página.</p>
+      </div>
+    );
+  }
 
   const handleAddTreinador = async () => {
     if (!novoTreinador.nome || !novoTreinador.email) return;

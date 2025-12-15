@@ -32,6 +32,7 @@ import {
   processarAtletasComCalculos,
 } from "@/lib/api";
 import { toast } from "sonner";
+import { isMasterEmail } from "@/lib/permissions";
 
 // Dados mock para desenvolvimento
 const MOCK_TREINADORES: Treinador[] = [
@@ -180,6 +181,12 @@ export default function HomePage() {
   const [novoAtletaModalOpen, setNovoAtletaModalOpen] = useState(false);
   const [useMockData] = useState(!process.env.NEXT_PUBLIC_GOOGLE_SCRIPT_URL);
 
+  const userEmail =
+    user?.primaryEmailAddress?.emailAddress?.toLowerCase() ||
+    user?.emailAddresses?.[0]?.emailAddress?.toLowerCase() ||
+    null;
+  const isMaster = isMasterEmail(userEmail);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -222,8 +229,19 @@ export default function HomePage() {
     [atletas, treinadores, logConversas]
   );
 
+  const treinadorAtual = useMemo(
+    () => treinadores.find((t) => t.email?.toLowerCase() === userEmail),
+    [treinadores, userEmail]
+  );
+
+  const atletasVisiveis = useMemo(() => {
+    if (isMaster) return atletasComCalculos;
+    if (!treinadorAtual) return [];
+    return atletasComCalculos.filter((a) => a.professor_id === treinadorAtual.id);
+  }, [isMaster, treinadorAtual, atletasComCalculos]);
+
   const atletasFiltrados = useMemo(() => {
-    return atletasComCalculos.filter((atleta) => {
+    return atletasVisiveis.filter((atleta) => {
       // Filtros especiais do dashboard
       if (filtros.especial) {
         switch (filtros.especial) {
@@ -264,29 +282,29 @@ export default function HomePage() {
       if (filtros.dias_treina && atleta.dias_treina !== filtros.dias_treina) return false;
       return true;
     });
-  }, [atletasComCalculos, filtros]);
+  }, [atletasVisiveis, filtros]);
 
   const dashboardStats: DashboardStats = useMemo(() => {
     return {
-      para_montar_semana: atletasComCalculos.filter(
+      para_montar_semana: atletasVisiveis.filter(
         (a) => a.dias >= 0 && a.dias <= 7 && a.status !== "treino_montado"
       ).length,
-      ja_com_treino: atletasComCalculos.filter(
+      ja_com_treino: atletasVisiveis.filter(
         (a) => a.status === "treino_montado" && a.dias >= 0
       ).length,
-      fecham_proxima_semana: atletasComCalculos.filter(
+      fecham_proxima_semana: atletasVisiveis.filter(
         (a) => a.dias >= 8 && a.dias <= 14
       ).length,
-      sem_treinador: atletasComCalculos.filter((a) => !a.professor_id).length,
-      atrasados: atletasComCalculos.filter((a) => a.dias < 0).length,
-      precisam_ajuste: atletasComCalculos.filter(
+      sem_treinador: atletasVisiveis.filter((a) => !a.professor_id).length,
+      atrasados: atletasVisiveis.filter((a) => a.dias < 0).length,
+      precisam_ajuste: atletasVisiveis.filter(
         (a) => a.status === "precisa_ajuste"
       ).length,
-      sem_conversa_semana: atletasComCalculos.filter(
+      sem_conversa_semana: atletasVisiveis.filter(
         (a) => !a.conversou_semana
       ).length,
     };
-  }, [atletasComCalculos]);
+  }, [atletasVisiveis]);
 
   const handleFilterClick = (filter: string) => {
     // Se clicar no mesmo filtro, limpa

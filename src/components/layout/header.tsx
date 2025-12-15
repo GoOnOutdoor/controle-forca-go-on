@@ -6,9 +6,17 @@ import { Users, Dumbbell, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useUser } from "@clerk/nextjs";
+import { isMasterEmail } from "@/lib/permissions";
 
 export function Header() {
   const pathname = usePathname();
+  const { user } = useUser();
+  const userEmail =
+    user?.primaryEmailAddress?.emailAddress ||
+    user?.emailAddresses?.[0]?.emailAddress ||
+    null;
+  const isMaster = isMasterEmail(userEmail);
 
   return (
     <header className="border-b bg-white">
@@ -34,24 +42,28 @@ export function Header() {
                 Dashboard
               </Button>
             </Link>
-            <Link href="/treinadores">
-              <Button
-                variant={pathname === "/treinadores" ? "secondary" : "ghost"}
-                size="sm"
-              >
-                <Users className="h-4 w-4 mr-2" />
-                Treinadores
-              </Button>
-            </Link>
-            <Link href="/configuracoes">
-              <Button
-                variant={pathname === "/configuracoes" ? "secondary" : "ghost"}
-                size="sm"
-              >
-                <Settings className="h-4 w-4 mr-2" />
-                Configurações
-              </Button>
-            </Link>
+            {isMaster && (
+              <>
+                <Link href="/treinadores">
+                  <Button
+                    variant={pathname === "/treinadores" ? "secondary" : "ghost"}
+                    size="sm"
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Treinadores
+                  </Button>
+                </Link>
+                <Link href="/configuracoes">
+                  <Button
+                    variant={pathname === "/configuracoes" ? "secondary" : "ghost"}
+                    size="sm"
+                  >
+                    <Settings className="h-4 w-4 mr-2" />
+                    Configurações
+                  </Button>
+                </Link>
+              </>
+            )}
           </nav>
         </div>
 

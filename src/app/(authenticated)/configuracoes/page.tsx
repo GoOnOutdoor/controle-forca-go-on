@@ -7,16 +7,56 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Trash2, Pencil, Check, X } from "lucide-react";
 import { getPlanos, addPlano, removePlano, updatePlano } from "@/lib/planos-storage";
 import { toast } from "sonner";
+import { useUser } from "@clerk/nextjs";
+import { isMasterEmail } from "@/lib/permissions";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ConfiguracoesPage() {
+  const { user, isLoaded } = useUser();
   const [planos, setPlanos] = useState<string[]>([]);
   const [novoPlano, setNovoPlano] = useState("");
   const [editando, setEditando] = useState<string | null>(null);
   const [valorEditando, setValorEditando] = useState("");
 
+  const userEmail =
+    user?.primaryEmailAddress?.emailAddress?.toLowerCase() ||
+    user?.emailAddresses?.[0]?.emailAddress?.toLowerCase() ||
+    null;
+  const isMaster = isMasterEmail(userEmail);
+
   useEffect(() => {
     setPlanos(getPlanos());
   }, []);
+
+  if (!isLoaded) {
+    return (
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <Skeleton className="h-7 w-44" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-5 w-24" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!isMaster) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold">Configurações</h1>
+        <p className="text-muted-foreground">Você não tem permissão para acessar esta página.</p>
+      </div>
+    );
+  }
 
   const handleAddPlano = () => {
     if (!novoPlano.trim()) return;
