@@ -231,6 +231,7 @@ export function processarAtletasComCalculos(
 
   return atletas.map((atleta) => {
     const professor = treinadores.find((t) => t.id === atleta.professor_id);
+    const treinadorCorrida = treinadores.find((t) => t.id === atleta.treinador_corrida_id);
 
     const conversouSemana = logConversas.some((log) => {
       if (log.atleta_id !== atleta.id) return false;
@@ -248,6 +249,7 @@ export function processarAtletasComCalculos(
       status: statusCalculado,
       tempo_ate_prova: calcularTempoAteProva(atleta.data_prova),
       professor_nome: professor?.nome || null,
+      treinador_corrida_nome: treinadorCorrida?.nome || null,
       conversou_semana: conversouSemana,
     };
   });

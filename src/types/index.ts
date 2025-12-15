@@ -33,6 +33,7 @@ export interface Atleta {
   id: string;
   nome: string;
   professor_id: string | null;
+  treinador_corrida_id: string | null;
   plano: Plano;
   ambiente: Ambiente;
   dias_treina: DiasTreina;
@@ -73,6 +74,7 @@ export interface AtletaComCalculos extends Atleta {
   dias: number; // calculado: diferença entre pronto_ate e hoje
   tempo_ate_prova: string | null; // calculado: "X semanas e Y dias" ou null
   professor_nome: string | null;
+  treinador_corrida_nome: string | null;
   conversou_semana: boolean;
   status_original?: Status;
 }

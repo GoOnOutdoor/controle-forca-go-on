@@ -40,6 +40,7 @@ export function NovoAtletaModal({
   const [formData, setFormData] = useState<Partial<Atleta>>({
     nome: "",
     professor_id: null,
+    treinador_corrida_id: null,
     plano: "PRO",
     ambiente: "Academia",
     dias_treina: 3,
@@ -68,6 +69,7 @@ export function NovoAtletaModal({
     setFormData({
       nome: "",
       professor_id: null,
+      treinador_corrida_id: null,
       plano: "PRO",
       ambiente: "Academia",
       dias_treina: 3,
@@ -135,6 +137,28 @@ export function NovoAtletaModal({
                 Cadastre treinadores na aba Treinadores primeiro
               </p>
             )}
+          </div>
+
+          <div>
+            <Label>Treinador Corrida</Label>
+            <Select
+              value={formData.treinador_corrida_id || "none"}
+              onValueChange={(v) =>
+                handleChange("treinador_corrida_id", v === "none" ? null : v)
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione um treinador de corrida" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sem treinador</SelectItem>
+                {treinadores.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

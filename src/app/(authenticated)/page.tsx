@@ -39,6 +39,7 @@ const MOCK_TREINADORES: Treinador[] = [
   { id: "1", nome: "Wesley", email: "wesley@goon.com", created_at: new Date().toISOString() },
   { id: "2", nome: "Bonatto", email: "bonatto@goon.com", created_at: new Date().toISOString() },
   { id: "3", nome: "Carlos", email: "carlos@goon.com", created_at: new Date().toISOString() },
+  { id: "4", nome: "Go On", email: "goon@goon.com", created_at: new Date().toISOString() },
 ];
 
 const MOCK_ATLETAS: Atleta[] = [
@@ -46,6 +47,7 @@ const MOCK_ATLETAS: Atleta[] = [
     id: "1",
     nome: "João Silva",
     professor_id: "1",
+    treinador_corrida_id: "4",
     plano: "PRO",
     ambiente: "Academia",
     dias_treina: 3,
@@ -69,6 +71,7 @@ const MOCK_ATLETAS: Atleta[] = [
     id: "2",
     nome: "Maria Santos",
     professor_id: "1",
+    treinador_corrida_id: null,
     plano: "PRO+",
     ambiente: "Home Gym",
     dias_treina: 4,
@@ -92,6 +95,7 @@ const MOCK_ATLETAS: Atleta[] = [
     id: "3",
     nome: "Pedro Costa",
     professor_id: "2",
+    treinador_corrida_id: "3",
     plano: "GOLD",
     ambiente: "Academia",
     dias_treina: 3,
@@ -115,6 +119,7 @@ const MOCK_ATLETAS: Atleta[] = [
     id: "4",
     nome: "Ana Oliveira",
     professor_id: null,
+    treinador_corrida_id: null,
     plano: "PRO",
     ambiente: "No Equip",
     dias_treina: 2,
@@ -138,6 +143,7 @@ const MOCK_ATLETAS: Atleta[] = [
     id: "5",
     nome: "Lucas Ferreira",
     professor_id: "1",
+    treinador_corrida_id: "4",
     plano: "PRO_TEAM",
     ambiente: "Academia",
     dias_treina: 4,
@@ -237,7 +243,12 @@ export default function HomePage() {
   const atletasVisiveis = useMemo(() => {
     if (isMaster) return atletasComCalculos;
     if (!treinadorAtual) return [];
-    return atletasComCalculos.filter((a) => a.professor_id === treinadorAtual.id);
+    return atletasComCalculos.filter((a) => {
+      const isGoOn =
+        (a.professor_nome && a.professor_nome.toLowerCase() === "go on") ||
+        false;
+      return isGoOn || a.professor_id === treinadorAtual.id;
+    });
   }, [isMaster, treinadorAtual, atletasComCalculos]);
 
   const atletasFiltrados = useMemo(() => {
@@ -342,6 +353,8 @@ export default function HomePage() {
           id: String(Date.now()),
           nome: data.nome || "",
           professor_id: data.professor_id || null,
+          treinador_corrida_id: data.treinador_corrida_id || null,
+          treinador_corrida_id: data.treinador_corrida_id || null,
           plano: data.plano || "PRO",
           ambiente: data.ambiente || "Academia",
           dias_treina: data.dias_treina || 3,

@@ -198,6 +198,28 @@ export function AtletaModal({
               </div>
 
               <div>
+                <Label>Treinador Corrida</Label>
+                <Select
+                  value={formData.treinador_corrida_id || "none"}
+                  onValueChange={(v) =>
+                    handleChange("treinador_corrida_id", v === "none" ? null : v)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sem treinador</SelectItem>
+                    {treinadores.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
                 <Label>Plano</Label>
                 <Select
                   value={formData.plano}

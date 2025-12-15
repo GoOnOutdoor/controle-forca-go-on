@@ -582,6 +582,7 @@ export function AtletasTable({
               >
                 <SortButton field="professor_nome">Professor</SortButton>
               </TableHead>
+              <TableHead className="w-[160px]">Treinador Corrida</TableHead>
               <TableHead className="w-[120px]">Plano</TableHead>
               <TableHead className="w-[130px]">Ambiente</TableHead>
               <TableHead className="w-[90px]">Dias/Sem</TableHead>
@@ -604,7 +605,7 @@ export function AtletasTable({
           <TableBody>
             {sortedAtletas.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={13} className="text-center py-8">
+                <TableCell colSpan={14} className="text-center py-8">
                   Nenhum atleta encontrado
                 </TableCell>
               </TableRow>
@@ -696,6 +697,9 @@ export function AtletasTable({
                   </TableCell>
                   <TableCell className="w-[160px] truncate" title={atleta.professor_nome || "-"}>
                     {atleta.professor_nome || "-"}
+                  </TableCell>
+                  <TableCell className="w-[160px] truncate" title={atleta.treinador_corrida_nome || "-"}>
+                    {atleta.treinador_corrida_nome || "-"}
                   </TableCell>
                   <TableCell className="w-[120px] truncate" title={atleta.plano}>
                     {atleta.plano}

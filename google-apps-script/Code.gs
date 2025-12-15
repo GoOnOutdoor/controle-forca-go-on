@@ -19,7 +19,7 @@ const SHEETS = {
 // Headers para cada aba
 const HEADERS = {
   ATLETAS: [
-    'id', 'nome', 'professor_id', 'plano', 'ambiente', 'dias_treina',
+    'id', 'nome', 'professor_id', 'treinador_corrida_id', 'plano', 'ambiente', 'dias_treina',
     'bloco_mfit', 'pronto_ate', 'status', 'prova_alvo', 'data_prova',
     'lesoes_ativas', 'limitacoes', 'perfil_comportamento', 'objetivos',
     'nivel_experiencia', 'equipamentos', 'notas_treinador', 'observacao',
@@ -210,6 +210,7 @@ function createAtleta(data) {
     id: generateUUID(),
     nome: data.nome || '',
     professor_id: data.professor_id || '',
+    treinador_corrida_id: data.treinador_corrida_id || '',
     plano: data.plano || 'PRO',
     ambiente: data.ambiente || 'Academia',
     dias_treina: data.dias_treina || 3,
