@@ -664,7 +664,6 @@ export function AtletasTable({
                     {atleta.bloco_mfit || "-"}
                   </TableCell>
                   <TableCell
-                    onClick={(e) => e.stopPropagation()}
                     className="w-[160px]"
                     onClick={(e) => {
                       e.stopPropagation();
