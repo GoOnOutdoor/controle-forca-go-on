@@ -132,8 +132,29 @@ export function AtletaModal({
     if (atleta) {
       setFormData(atleta);
     }
-    setPlanos(getPlanos());
-  }, [atleta]);
+    const storedPlanos = getPlanos();
+    if (atleta?.plano && !storedPlanos.includes(atleta.plano)) {
+      setPlanos([...storedPlanos, atleta.plano]);
+    } else {
+      setPlanos(storedPlanos);
+    }
+  }, [atleta, open]);
+
+  useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === "goon-planos") {
+        const storedPlanos = getPlanos();
+        const currentPlano = formData.plano;
+        if (currentPlano && !storedPlanos.includes(currentPlano)) {
+          setPlanos([...storedPlanos, currentPlano]);
+        } else {
+          setPlanos(storedPlanos);
+        }
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, [formData.plano]);
 
   if (!atleta) return null;
 

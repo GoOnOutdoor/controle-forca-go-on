@@ -53,6 +53,16 @@ export function NovoAtletaModal({
     setPlanos(getPlanos());
   }, [open]);
 
+  useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === "goon-planos") {
+        setPlanos(getPlanos());
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
   const handleChange = (field: string, value: unknown) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };

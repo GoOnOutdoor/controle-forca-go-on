@@ -158,6 +158,16 @@ export function AtletasTable({
   }, []);
 
   useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === "goon-planos") {
+        setPlanos(getPlanos());
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
+  useEffect(() => {
     // Se mudar filtro, limpa seleção para evitar aplicar em itens ocultos
     setSelectedIds(new Set());
   }, [filtros]);
