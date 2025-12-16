@@ -39,6 +39,7 @@ export function NovoAtletaModal({
   const [planos, setPlanos] = useState<string[]>([]);
   const [formData, setFormData] = useState<Partial<Atleta>>({
     nome: "",
+    telefone: "",
     professor_id: null,
     treinador_corrida_id: null,
     plano: "PRO",
@@ -78,6 +79,7 @@ export function NovoAtletaModal({
     setSaving(false);
     setFormData({
       nome: "",
+      telefone: "",
       professor_id: null,
       treinador_corrida_id: null,
       plano: "PRO",
@@ -93,7 +95,9 @@ export function NovoAtletaModal({
   const handleClose = () => {
     setFormData({
       nome: "",
+      telefone: "",
       professor_id: null,
+      treinador_corrida_id: null,
       plano: "PRO",
       ambiente: "Academia",
       dias_treina: 3,
@@ -119,6 +123,17 @@ export function NovoAtletaModal({
               value={formData.nome || ""}
               onChange={(e) => handleChange("nome", e.target.value)}
               placeholder="Nome completo do atleta"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="telefone">Telefone (WhatsApp)</Label>
+            <Input
+              id="telefone"
+              type="tel"
+              value={formData.telefone || ""}
+              onChange={(e) => handleChange("telefone", e.target.value)}
+              placeholder="Ex.: +55 11 98888-7777"
             />
           </div>
 

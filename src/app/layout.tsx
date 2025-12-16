@@ -10,6 +10,11 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Go On Força Manager",
   description: "Sistema de gestão de atletas de força da Go On Outdoor",
+  icons: {
+    icon: "/icons/logo-go-on-outdoor.png",
+    shortcut: "/icons/logo-go-on-outdoor.png",
+    apple: "/icons/logo-go-on-outdoor.png",
+  },
 };
 
 export default function RootLayout({

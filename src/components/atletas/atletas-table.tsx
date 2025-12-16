@@ -2,6 +2,7 @@
 
 import type { KeyboardEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import {
   Table,
   TableBody,
@@ -55,6 +56,7 @@ interface AtletasTableProps {
   filtros: FiltrosAtleta;
   onFiltrosChange: (filtros: FiltrosAtleta) => void;
   onAtletaClick: (atleta: AtletaComCalculos) => void;
+  onOpenWhatsapp: (atleta: AtletaComCalculos) => void;
   onUpdateAtleta: (id: string, data: Partial<AtletaComCalculos>) => void;
   onBulkUpdate: (ids: string[], data: Partial<AtletaComCalculos>) => Promise<void>;
 }
@@ -139,6 +141,7 @@ export function AtletasTable({
   filtros,
   onFiltrosChange,
   onAtletaClick,
+  onOpenWhatsapp,
   onUpdateAtleta,
   onBulkUpdate,
 }: AtletasTableProps) {
@@ -609,13 +612,14 @@ export function AtletasTable({
               >
                 <SortButton field="tempo_ate_prova">Tempo até Prova</SortButton>
               </TableHead>
+              <TableHead className="w-[90px] text-center">WhatsApp</TableHead>
               <TableHead className="w-[70px] text-center">Conversa</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sortedAtletas.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={14} className="text-center py-8">
+                <TableCell colSpan={15} className="text-center py-8">
                   Nenhum atleta encontrado
                 </TableCell>
               </TableRow>
@@ -722,6 +726,31 @@ export function AtletasTable({
                   <TableCell className="w-[150px] truncate">
                     {atleta.tempo_ate_prova || "Sem prova definida"}
                   </TableCell>
+                  <TableCell className="text-center w-[90px]" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="mx-auto"
+                      onClick={() => onOpenWhatsapp(atleta)}
+                      disabled={!atleta.telefone}
+                    aria-label={
+                      atleta.telefone
+                        ? `Conversar com ${atleta.nome} no WhatsApp`
+                        : "Telefone não informado"
+                    }
+                  >
+                      <Image
+                        src="/icons/whatsapp.svg"
+                        alt="WhatsApp"
+                        width={20}
+                        height={20}
+                        className={cn(
+                          "h-5 w-5",
+                          atleta.telefone ? "opacity-100" : "opacity-40"
+                        )}
+                      />
+                    </Button>
+                  </TableCell>
                   <TableCell className="text-center w-[70px]">
                     {atleta.conversou_semana ? (
                       <CheckCircle2
@@ -753,14 +782,21 @@ export function AtletasTable({
           sortedAtletas.map((atleta) => {
             const urgency = getRowUrgency(atleta);
             return (
-              <button
+              <div
                 key={atleta.id}
-                type="button"
                 className={cn(
                   "w-full rounded-lg border p-4 text-left shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
                   rowUrgencyStyles[urgency]
                 )}
+                role="button"
+                tabIndex={0}
                 onClick={() => onAtletaClick(atleta)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onAtletaClick(atleta);
+                  }
+                }}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1">
@@ -817,6 +853,33 @@ export function AtletasTable({
                   </div>
                 </div>
 
+                <div className="mt-3">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="w-full"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenWhatsapp(atleta);
+                  }}
+                  disabled={!atleta.telefone}
+                >
+                    <Image
+                      src="/icons/whatsapp.svg"
+                      alt="WhatsApp"
+                      width={18}
+                      height={18}
+                      className="mr-2"
+                    />
+                  WhatsApp
+                </Button>
+                {!atleta.telefone && (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Adicione telefone para liberar o WhatsApp.
+                    </p>
+                  )}
+                </div>
+
                 <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
                   <span>{atleta.prova_alvo || "Sem prova alvo"}</span>
                   <span className="flex items-center gap-1">
@@ -833,7 +896,7 @@ export function AtletasTable({
                     )}
                   </span>
                 </div>
-              </button>
+              </div>
             );
           })
         )}

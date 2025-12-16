@@ -2,8 +2,9 @@
 
 import { UserButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
-import { Users, Dumbbell, Settings } from "lucide-react";
+import { Users, Settings } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useUser } from "@clerk/nextjs";
@@ -29,7 +30,14 @@ export function Header() {
       <div className="container mx-auto px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4 flex-wrap">
           <Link href="/" className="flex items-center gap-2">
-            <Dumbbell className="h-6 w-6" />
+            <Image
+              src="/icons/logo-go-on-outdoor.png"
+              alt="Go On Outdoor"
+              width={32}
+              height={32}
+              className="h-8 w-8 rounded"
+              priority
+            />
             <span className="font-bold text-lg">Go On Força</span>
           </Link>
 

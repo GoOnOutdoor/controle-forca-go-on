@@ -32,6 +32,7 @@ export interface Treinador {
 export interface Atleta {
   id: string;
   nome: string;
+  telefone: string;
   professor_id: string | null;
   treinador_corrida_id: string | null;
   plano: Plano;

@@ -46,6 +46,7 @@ const MOCK_ATLETAS: Atleta[] = [
   {
     id: "1",
     nome: "João Silva",
+    telefone: "+5511999999999",
     professor_id: "1",
     treinador_corrida_id: "4",
     plano: "PRO",
@@ -70,6 +71,7 @@ const MOCK_ATLETAS: Atleta[] = [
   {
     id: "2",
     nome: "Maria Santos",
+    telefone: "+5511988887777",
     professor_id: "1",
     treinador_corrida_id: null,
     plano: "PRO+",
@@ -94,6 +96,7 @@ const MOCK_ATLETAS: Atleta[] = [
   {
     id: "3",
     nome: "Pedro Costa",
+    telefone: "+5541999991234",
     professor_id: "2",
     treinador_corrida_id: "3",
     plano: "GOLD",
@@ -118,6 +121,7 @@ const MOCK_ATLETAS: Atleta[] = [
   {
     id: "4",
     nome: "Ana Oliveira",
+    telefone: "",
     professor_id: null,
     treinador_corrida_id: null,
     plano: "PRO",
@@ -142,6 +146,7 @@ const MOCK_ATLETAS: Atleta[] = [
   {
     id: "5",
     nome: "Lucas Ferreira",
+    telefone: "+5511988877665",
     professor_id: "1",
     treinador_corrida_id: "4",
     plano: "PRO_TEAM",
@@ -192,6 +197,29 @@ export default function HomePage() {
     user?.emailAddresses?.[0]?.emailAddress?.toLowerCase() ||
     null;
   const isMaster = isMasterEmail(userEmail);
+
+  const getTreinadorIdAtual = useCallback(() => {
+    const treinadorAtual = treinadores.find((t) => t.email?.toLowerCase() === userEmail);
+    return treinadorAtual?.id || "1";
+  }, [treinadores, userEmail]);
+
+  const normalizarTelefoneParaWhatsapp = useCallback((telefone: unknown) => {
+    const digits = String(telefone ?? "").replace(/\D/g, "");
+    if (!digits) return null;
+
+    // remover prefixo 00 (ex.: 0044...), se enviado
+    const cleaned = digits.startsWith("00") ? digits.slice(2) : digits;
+
+    // se já veio com DDI (12+ dígitos ou começa com 55) mantém
+    if (cleaned.startsWith("55")) return cleaned;
+    if (cleaned.length > 11) return cleaned;
+
+    // se veio no formato nacional (10/11 dígitos), prefixa Brasil
+    if (cleaned.length >= 10 && cleaned.length <= 11) return `55${cleaned}`;
+
+    // qualquer outro formato retorna null para forçar correção manual
+    return null;
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -335,8 +363,8 @@ export default function HomePage() {
           prev.map((a) => (a.id === id ? { ...a, ...data, updated_at: new Date().toISOString() } : a))
         );
       } else {
-        await updateAtleta(id, data);
-        await loadData();
+        const atualizado = await updateAtleta(id, data);
+        setAtletas((prev) => prev.map((a) => (a.id === id ? { ...a, ...atualizado } : a)));
       }
       setSelectedAtleta(null);
       toast.success("Atleta atualizado com sucesso!");
@@ -352,6 +380,7 @@ export default function HomePage() {
         const novoAtleta: Atleta = {
           id: String(Date.now()),
           nome: data.nome || "",
+          telefone: data.telefone || "",
           professor_id: data.professor_id || null,
           treinador_corrida_id: data.treinador_corrida_id || null,
           plano: data.plano || "PRO",
@@ -375,8 +404,8 @@ export default function HomePage() {
         };
         setAtletas((prev) => [...prev, novoAtleta]);
       } else {
-        await createAtleta(data);
-        await loadData();
+        const criado = await createAtleta(data);
+        setAtletas((prev) => [...prev, criado]);
       }
       toast.success("Atleta criado com sucesso!");
     } catch (error) {
@@ -389,8 +418,7 @@ export default function HomePage() {
     if (!selectedAtleta || !user) return;
 
     try {
-      const treinadorAtual = treinadores.find((t) => t.email === user.emailAddresses[0]?.emailAddress);
-      const treinadorId = treinadorAtual?.id || "1";
+      const treinadorId = getTreinadorIdAtual();
 
       if (useMockData) {
         const newNote: HandoffNote = {
@@ -402,12 +430,12 @@ export default function HomePage() {
         };
         setHandoffNotes((prev) => [...prev, newNote]);
       } else {
-        await createHandoffNote({
+        const criada = await createHandoffNote({
           atleta_id: selectedAtleta.id,
           treinador_id: treinadorId,
           conteudo,
         });
-        await loadData();
+        setHandoffNotes((prev) => [...prev, criada]);
       }
       toast.success("Nota de handoff adicionada!");
     } catch (error) {
@@ -416,34 +444,45 @@ export default function HomePage() {
     }
   };
 
-  const handleRegistrarConversa = async () => {
-    if (!selectedAtleta || !user) return;
-
-    try {
-      const treinadorAtual = treinadores.find((t) => t.email === user.emailAddresses[0]?.emailAddress);
-      const treinadorId = treinadorAtual?.id || "1";
-
-      if (useMockData) {
-        const newLog: LogConversa = {
-          id: String(Date.now()),
-          atleta_id: selectedAtleta.id,
-          treinador_id: treinadorId,
-          created_at: new Date().toISOString(),
-        };
-        setLogConversas((prev) => [...prev, newLog]);
-      } else {
-        await createLogConversa({
-          atleta_id: selectedAtleta.id,
-          treinador_id: treinadorId,
-        });
-        await loadData();
+  const registrarConversa = useCallback(
+    async (atletaId: string) => {
+      if (!user) {
+        toast.error("Usuário não autenticado");
+        return false;
       }
-      toast.success("Conversa registrada com sucesso!");
-    } catch (error) {
-      console.error("Erro ao registrar conversa:", error);
-      toast.error("Erro ao registrar conversa. Tente novamente.");
-    }
-  };
+
+      const treinadorId = getTreinadorIdAtual();
+      const tempLog: LogConversa = {
+        id: `temp-${Date.now()}`,
+        atleta_id: atletaId,
+        treinador_id: treinadorId,
+        created_at: new Date().toISOString(),
+      };
+
+      // Otimista para não bloquear a UI
+      setLogConversas((prev) => [...prev, tempLog]);
+
+      try {
+        if (!useMockData) {
+          const saved = await createLogConversa({
+            atleta_id: atletaId,
+            treinador_id: treinadorId,
+          });
+          setLogConversas((prev) =>
+            prev.map((log) => (log.id === tempLog.id ? saved : log))
+          );
+        }
+        toast.success("Conversa registrada!");
+        return true;
+      } catch (error) {
+        console.error("Erro ao registrar conversa:", error);
+        setLogConversas((prev) => prev.filter((log) => log.id !== tempLog.id));
+        toast.error("Erro ao registrar conversa. Tente novamente.");
+        return false;
+      }
+    },
+    [getTreinadorIdAtual, setLogConversas, useMockData, user]
+  );
 
   const selectedAtletaHandoffNotes = useMemo(
     () => handoffNotes.filter((n) => n.atleta_id === selectedAtleta?.id),
@@ -455,6 +494,25 @@ export default function HomePage() {
     [logConversas, selectedAtleta]
   );
 
+  const handleRegistrarConversa = () => {
+    if (!selectedAtleta) return;
+    registrarConversa(selectedAtleta.id);
+  };
+
+  const handleOpenWhatsapp = async (atleta: AtletaComCalculos) => {
+    const normalized = normalizarTelefoneParaWhatsapp(atleta.telefone);
+    if (!normalized) {
+      toast.error("Telefone inválido ou ausente.");
+      return;
+    }
+
+    const waUrl = `https://wa.me/${normalized}`;
+    // abre primeiro para reduzir latência percebida e evitar bloqueio
+    window.open(waUrl, "_blank", "noopener,noreferrer");
+    // registra em paralelo, sem travar o clique
+    registrarConversa(atleta.id);
+  };
+
   const handleBulkUpdateAtletas = async (ids: string[], data: Partial<AtletaComCalculos>) => {
     if (ids.length === 0) return;
     if (useMockData) {
@@ -465,8 +523,13 @@ export default function HomePage() {
     }
 
     try {
-      await Promise.all(ids.map((id) => updateAtleta(id, data)));
-      await loadData();
+      const atualizados = await Promise.all(ids.map((id) => updateAtleta(id, data)));
+      setAtletas((prev) =>
+        prev.map((a) => {
+          const updated = atualizados.find((u) => u.id === a.id);
+          return updated ? { ...a, ...updated } : a;
+        })
+      );
     } catch (error) {
       console.error("Erro ao atualizar em massa:", error);
       throw error;
@@ -524,6 +587,7 @@ export default function HomePage() {
           filtros={filtros}
           onFiltrosChange={setFiltros}
           onAtletaClick={setSelectedAtleta}
+          onOpenWhatsapp={handleOpenWhatsapp}
           onUpdateAtleta={handleUpdateAtleta}
           onBulkUpdate={handleBulkUpdateAtletas}
         />
@@ -539,6 +603,7 @@ export default function HomePage() {
             onSave={(data) => handleUpdateAtleta(selectedAtleta!.id, data)}
             onAddHandoffNote={handleAddHandoffNote}
             onRegistrarConversa={handleRegistrarConversa}
+            onOpenWhatsapp={handleOpenWhatsapp}
           />
 
           <NovoAtletaModal

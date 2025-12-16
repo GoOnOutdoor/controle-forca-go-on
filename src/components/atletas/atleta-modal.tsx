@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import {
   Dialog,
   DialogContent,
@@ -24,15 +25,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import {
-  MessageSquare,
-  Calendar,
-  Target,
-  User,
-  FileText,
-  Clock,
-  ChevronDown,
-} from "lucide-react";
+import { MessageSquare, Calendar, Target, User, FileText, Clock, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type {
   AtletaComCalculos,
@@ -58,6 +51,7 @@ interface AtletaModalProps {
   onSave: (data: Partial<AtletaComCalculos>) => void;
   onAddHandoffNote: (conteudo: string) => void;
   onRegistrarConversa: () => void;
+  onOpenWhatsapp: (atleta: AtletaComCalculos) => void;
 }
 
 // Componente auxiliar para seções colapsáveis
@@ -110,6 +104,7 @@ export function AtletaModal({
   onSave,
   onAddHandoffNote,
   onRegistrarConversa,
+  onOpenWhatsapp,
 }: AtletaModalProps) {
   const [formData, setFormData] = useState<Partial<AtletaComCalculos>>({});
   const [novaHandoffNote, setNovaHandoffNote] = useState("");
@@ -196,6 +191,16 @@ export function AtletaModal({
             onToggle={() => toggleSection("basico")}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="sm:col-span-2">
+                <Label>Telefone (WhatsApp)</Label>
+                <Input
+                  type="tel"
+                  value={formData.telefone || ""}
+                  onChange={(e) => handleChange("telefone", e.target.value)}
+                  placeholder="Ex.: +55 11 98888-7777"
+                />
+              </div>
+
               <div>
                 <Label>Professor</Label>
                 <Select
@@ -607,10 +612,31 @@ export function AtletaModal({
             }
           >
             <div className="space-y-4">
-              <Button onClick={onRegistrarConversa}>
-                <Clock className="h-4 w-4 mr-2" />
-                Registrar Conversa
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => onOpenWhatsapp(atleta)}
+                  disabled={!atleta.telefone}
+                >
+                  <Image
+                    src="/icons/whatsapp.svg"
+                    alt="WhatsApp"
+                    width={18}
+                    height={18}
+                    className="mr-2"
+                  />
+                  Abrir WhatsApp
+                </Button>
+                <Button onClick={onRegistrarConversa}>
+                  <Clock className="h-4 w-4 mr-2" />
+                  Registrar Conversa
+                </Button>
+              </div>
+              {!atleta.telefone && (
+                <p className="text-sm text-muted-foreground">
+                  Adicione um telefone para habilitar o WhatsApp.
+                </p>
+              )}
 
               {logConversas.length > 0 ? (
                 <div className="space-y-1 max-h-32 overflow-y-auto">

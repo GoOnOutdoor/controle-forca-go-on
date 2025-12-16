@@ -116,11 +116,11 @@ export default function TreinadoresPage() {
 
     setSaving(true);
     try {
-      await createTreinador({
+      const criado = await createTreinador({
         nome: novoTreinador.nome,
         email: novoTreinador.email,
       });
-      await loadData();
+      setTreinadores((prev) => [...prev, criado]);
       setNovoTreinador({ nome: "", email: "" });
       setModalOpen(false);
       toast.success("Treinador adicionado com sucesso!");
@@ -135,12 +135,16 @@ export default function TreinadoresPage() {
   const handleRemoveTreinador = async (id: string) => {
     if (!confirm("Tem certeza que deseja remover este treinador?")) return;
 
+    // remove otimista para deixar a UI rápida
+    setTreinadores((prev) => prev.filter((t) => t.id !== id));
+
     try {
       await deleteTreinador(id);
-      await loadData();
       toast.success("Treinador removido com sucesso!");
     } catch (error) {
       console.error("Erro ao remover treinador:", error);
+      // rollback se falhar
+      await loadData();
       toast.error("Erro ao remover treinador. Tente novamente.");
     }
   };
