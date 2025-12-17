@@ -65,9 +65,17 @@ type SortField =
   | "nome"
   | "dias"
   | "pronto_ate"
+  | "bloco_mfit"
   | "status"
   | "professor_nome"
-  | "tempo_ate_prova";
+  | "treinador_corrida_nome"
+  | "plano"
+  | "ambiente"
+  | "dias_treina"
+  | "prova_alvo"
+  | "tempo_ate_prova"
+  | "whatsapp"
+  | "conversou_semana";
 type SortDirection = "asc" | "desc";
 
 const statusColors: Record<Status, string> = {
@@ -147,6 +155,24 @@ export function AtletasTable({
 }: AtletasTableProps) {
   const [sortField, setSortField] = useState<SortField>("dias");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const defaultColumnWidths = {
+    select: 50,
+    nome: 220,
+    dias: 80,
+    pronto_ate: 130,
+    bloco_mfit: 160,
+    status: 160,
+    professor_nome: 160,
+    treinador_corrida_nome: 160,
+    plano: 120,
+    ambiente: 130,
+    dias_treina: 90,
+    prova_alvo: 160,
+    tempo_ate_prova: 150,
+    whatsapp: 90,
+    conversa: 70,
+  } as const;
+  const [columnWidths, setColumnWidths] = useState<Record<keyof typeof defaultColumnWidths, number>>(defaultColumnWidths);
   const [planos, setPlanos] = useState<string[]>([]);
   const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -193,6 +219,37 @@ export function AtletasTable({
     }
   };
 
+  const startResizing = (
+    column: keyof typeof defaultColumnWidths,
+    event: React.MouseEvent<HTMLDivElement>
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    const startWidth = columnWidths[column];
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const delta = moveEvent.clientX - startX;
+      setColumnWidths((prev) => ({
+        ...prev,
+        [column]: Math.max(60, startWidth + delta),
+      }));
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+  };
+
+  const getColumnStyle = (column: keyof typeof defaultColumnWidths) => ({
+    width: `${columnWidths[column]}px`,
+    minWidth: `${columnWidths[column]}px`,
+  });
+
   const sortedAtletas = useMemo(() => {
     return [...atletas].sort((a, b) => {
       let comparison = 0;
@@ -207,6 +264,9 @@ export function AtletasTable({
         case "pronto_ate":
           comparison = (a.pronto_ate || "").localeCompare(b.pronto_ate || "");
           break;
+        case "bloco_mfit":
+          comparison = (a.bloco_mfit || "").localeCompare(b.bloco_mfit || "");
+          break;
         case "status":
           comparison = a.status.localeCompare(b.status);
           break;
@@ -215,10 +275,40 @@ export function AtletasTable({
             b.professor_nome || ""
           );
           break;
+        case "treinador_corrida_nome":
+          comparison = (a.treinador_corrida_nome || "").localeCompare(
+            b.treinador_corrida_nome || ""
+          );
+          break;
+        case "plano":
+          comparison = (a.plano || "").localeCompare(b.plano || "");
+          break;
+        case "ambiente":
+          comparison = (a.ambiente || "").localeCompare(b.ambiente || "");
+          break;
+        case "dias_treina":
+          comparison = (a.dias_treina || 0) - (b.dias_treina || 0);
+          break;
+        case "prova_alvo":
+          comparison = (a.prova_alvo || "").localeCompare(b.prova_alvo || "");
+          break;
         case "tempo_ate_prova":
           comparison = (a.tempo_ate_prova || "zzz").localeCompare(
             b.tempo_ate_prova || "zzz"
           );
+          break;
+        case "whatsapp": {
+          const aHasPhone = Boolean(a.telefone);
+          const bHasPhone = Boolean(b.telefone);
+          if (aHasPhone !== bHasPhone) {
+            comparison = Number(aHasPhone) - Number(bHasPhone);
+          } else {
+            comparison = (a.telefone || "").localeCompare(b.telefone || "");
+          }
+          break;
+        }
+        case "conversou_semana":
+          comparison = Number(a.conversou_semana) - Number(b.conversou_semana);
           break;
       }
 
@@ -522,7 +612,10 @@ export function AtletasTable({
         <Table className="min-w-[1200px] table-fixed">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[50px]">
+              <TableHead
+                className="w-[50px] relative"
+                style={getColumnStyle("select")}
+              >
                 <input
                   type="checkbox"
                   aria-label="Selecionar todos"
@@ -533,9 +626,14 @@ export function AtletasTable({
                   onChange={toggleSelectAll}
                   className="h-4 w-4 accent-primary"
                 />
+                <div
+                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
+                  onMouseDown={(event) => startResizing("select", event)}
+                />
               </TableHead>
               <TableHead
-                className="w-[220px]"
+                className="w-[220px] relative"
+                style={getColumnStyle("nome")}
                 aria-sort={
                   sortField === "nome"
                     ? sortDirection === "asc"
@@ -545,9 +643,14 @@ export function AtletasTable({
                 }
               >
                 <SortButton field="nome">Nome</SortButton>
+                <div
+                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
+                  onMouseDown={(event) => startResizing("nome", event)}
+                />
               </TableHead>
               <TableHead
-                className="w-[80px]"
+                className="w-[80px] relative"
+                style={getColumnStyle("dias")}
                 aria-sort={
                   sortField === "dias"
                     ? sortDirection === "asc"
@@ -557,9 +660,14 @@ export function AtletasTable({
                 }
               >
                 <SortButton field="dias">Dias</SortButton>
+                <div
+                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
+                  onMouseDown={(event) => startResizing("dias", event)}
+                />
               </TableHead>
               <TableHead
-                className="w-[130px]"
+                className="w-[130px] relative"
+                style={getColumnStyle("pronto_ate")}
                 aria-sort={
                   sortField === "pronto_ate"
                     ? sortDirection === "asc"
@@ -569,10 +677,31 @@ export function AtletasTable({
                 }
               >
                 <SortButton field="pronto_ate">Pronto até</SortButton>
+                <div
+                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
+                  onMouseDown={(event) => startResizing("pronto_ate", event)}
+                />
               </TableHead>
-              <TableHead className="w-[160px]">Bloco Mfit</TableHead>
               <TableHead
-                className="w-[160px]"
+                className="w-[160px] relative"
+                style={getColumnStyle("bloco_mfit")}
+                aria-sort={
+                  sortField === "bloco_mfit"
+                    ? sortDirection === "asc"
+                      ? "ascending"
+                      : "descending"
+                    : "none"
+                }
+              >
+                <SortButton field="bloco_mfit">Bloco Mfit</SortButton>
+                <div
+                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
+                  onMouseDown={(event) => startResizing("bloco_mfit", event)}
+                />
+              </TableHead>
+              <TableHead
+                className="w-[160px] relative"
+                style={getColumnStyle("status")}
                 aria-sort={
                   sortField === "status"
                     ? sortDirection === "asc"
@@ -582,9 +711,14 @@ export function AtletasTable({
                 }
               >
                 <SortButton field="status">Status</SortButton>
+                <div
+                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
+                  onMouseDown={(event) => startResizing("status", event)}
+                />
               </TableHead>
               <TableHead
-                className="w-[160px]"
+                className="w-[160px] relative"
+                style={getColumnStyle("professor_nome")}
                 aria-sort={
                   sortField === "professor_nome"
                     ? sortDirection === "asc"
@@ -594,14 +728,101 @@ export function AtletasTable({
                 }
               >
                 <SortButton field="professor_nome">Professor</SortButton>
+                <div
+                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
+                  onMouseDown={(event) => startResizing("professor_nome", event)}
+                />
               </TableHead>
-              <TableHead className="w-[160px]">Treinador Corrida</TableHead>
-              <TableHead className="w-[120px]">Plano</TableHead>
-              <TableHead className="w-[130px]">Ambiente</TableHead>
-              <TableHead className="w-[90px]">Dias/Sem</TableHead>
-              <TableHead className="w-[160px]">Prova Alvo</TableHead>
               <TableHead
-                className="w-[150px]"
+                className="w-[160px] relative"
+                style={getColumnStyle("treinador_corrida_nome")}
+                aria-sort={
+                  sortField === "treinador_corrida_nome"
+                    ? sortDirection === "asc"
+                      ? "ascending"
+                      : "descending"
+                    : "none"
+                }
+              >
+                <SortButton field="treinador_corrida_nome">
+                  Treinador Corrida
+                </SortButton>
+                <div
+                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
+                  onMouseDown={(event) => startResizing("treinador_corrida_nome", event)}
+                />
+              </TableHead>
+              <TableHead
+                className="w-[120px] relative"
+                style={getColumnStyle("plano")}
+                aria-sort={
+                  sortField === "plano"
+                    ? sortDirection === "asc"
+                      ? "ascending"
+                      : "descending"
+                    : "none"
+                }
+              >
+                <SortButton field="plano">Plano</SortButton>
+                <div
+                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
+                  onMouseDown={(event) => startResizing("plano", event)}
+                />
+              </TableHead>
+              <TableHead
+                className="w-[130px] relative"
+                style={getColumnStyle("ambiente")}
+                aria-sort={
+                  sortField === "ambiente"
+                    ? sortDirection === "asc"
+                      ? "ascending"
+                      : "descending"
+                    : "none"
+                }
+              >
+                <SortButton field="ambiente">Ambiente</SortButton>
+                <div
+                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
+                  onMouseDown={(event) => startResizing("ambiente", event)}
+                />
+              </TableHead>
+              <TableHead
+                className="w-[90px] relative"
+                style={getColumnStyle("dias_treina")}
+                aria-sort={
+                  sortField === "dias_treina"
+                    ? sortDirection === "asc"
+                      ? "ascending"
+                      : "descending"
+                    : "none"
+                }
+              >
+                <SortButton field="dias_treina">Dias/Sem</SortButton>
+                <div
+                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
+                  onMouseDown={(event) => startResizing("dias_treina", event)}
+                />
+              </TableHead>
+              <TableHead
+                className="w-[160px] relative"
+                style={getColumnStyle("prova_alvo")}
+                aria-sort={
+                  sortField === "prova_alvo"
+                    ? sortDirection === "asc"
+                      ? "ascending"
+                      : "descending"
+                    : "none"
+                }
+              >
+                <SortButton field="prova_alvo">Prova Alvo</SortButton>
+                <div
+                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
+                  onMouseDown={(event) => startResizing("prova_alvo", event)}
+                />
+              </TableHead>
+              <TableHead
+                className="w-[150px] relative"
+                style={getColumnStyle("tempo_ate_prova")}
                 aria-sort={
                   sortField === "tempo_ate_prova"
                     ? sortDirection === "asc"
@@ -611,9 +832,45 @@ export function AtletasTable({
                 }
               >
                 <SortButton field="tempo_ate_prova">Tempo até Prova</SortButton>
+                <div
+                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
+                  onMouseDown={(event) => startResizing("tempo_ate_prova", event)}
+                />
               </TableHead>
-              <TableHead className="w-[90px] text-center">WhatsApp</TableHead>
-              <TableHead className="w-[70px] text-center">Conversa</TableHead>
+              <TableHead
+                className="w-[90px] text-center relative"
+                style={getColumnStyle("whatsapp")}
+                aria-sort={
+                  sortField === "whatsapp"
+                    ? sortDirection === "asc"
+                      ? "ascending"
+                      : "descending"
+                    : "none"
+                }
+              >
+                <SortButton field="whatsapp">WhatsApp</SortButton>
+                <div
+                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
+                  onMouseDown={(event) => startResizing("whatsapp", event)}
+                />
+              </TableHead>
+              <TableHead
+                className="w-[70px] text-center relative"
+                style={getColumnStyle("conversa")}
+                aria-sort={
+                  sortField === "conversou_semana"
+                    ? sortDirection === "asc"
+                      ? "ascending"
+                      : "descending"
+                    : "none"
+                }
+              >
+                <SortButton field="conversou_semana">Conversa</SortButton>
+                <div
+                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
+                  onMouseDown={(event) => startResizing("conversa", event)}
+                />
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -627,23 +884,30 @@ export function AtletasTable({
               sortedAtletas.map((atleta) => {
                 const urgency = getRowUrgency(atleta);
                 return (
-                <TableRow
-                  key={atleta.id}
-                  className={cn("cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring/60", rowUrgencyStyles[urgency])}
-                  onClick={() => onAtletaClick(atleta)}
-                  tabIndex={0}
-                  onKeyDown={(event) => handleRowKeyDown(atleta, event)}
-                >
-                  <TableCell onClick={(e) => e.stopPropagation()} className="w-[50px]">
-                    <input
-                      type="checkbox"
-                      aria-label={`Selecionar ${atleta.nome}`}
-                      checked={selectedIds.has(atleta.id)}
-                      onChange={() => toggleSelectOne(atleta.id)}
-                      className="h-4 w-4 accent-primary"
-                    />
-                  </TableCell>
-                  <TableCell className="font-medium w-[220px] truncate">
+                  <TableRow
+                    key={atleta.id}
+                    className={cn("cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring/60", rowUrgencyStyles[urgency])}
+                    onClick={() => onAtletaClick(atleta)}
+                    tabIndex={0}
+                    onKeyDown={(event) => handleRowKeyDown(atleta, event)}
+                  >
+                    <TableCell
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-[50px]"
+                      style={getColumnStyle("select")}
+                    >
+                      <input
+                        type="checkbox"
+                        aria-label={`Selecionar ${atleta.nome}`}
+                        checked={selectedIds.has(atleta.id)}
+                        onChange={() => toggleSelectOne(atleta.id)}
+                        className="h-4 w-4 accent-primary"
+                      />
+                    </TableCell>
+                  <TableCell
+                    className="font-medium w-[220px] truncate"
+                    style={getColumnStyle("nome")}
+                  >
                     <div className="flex items-center gap-2">
                       {urgency === "critical" && (
                         <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
@@ -657,7 +921,7 @@ export function AtletasTable({
                       {atleta.nome}
                     </div>
                   </TableCell>
-                  <TableCell className="w-[80px]">
+                  <TableCell className="w-[80px]" style={getColumnStyle("dias")}>
                     <span
                       className={cn(
                         "font-semibold px-2 py-1 rounded",
@@ -670,16 +934,24 @@ export function AtletasTable({
                       {atleta.dias}
                     </span>
                   </TableCell>
-                  <TableCell className="w-[130px]">
+                  <TableCell
+                    className="w-[130px]"
+                    style={getColumnStyle("pronto_ate")}
+                  >
                     {atleta.pronto_ate
                       ? new Date(atleta.pronto_ate).toLocaleDateString("pt-BR")
                       : "-"}
                   </TableCell>
-                  <TableCell className="w-[160px] truncate" title={atleta.bloco_mfit || "-"}>
+                  <TableCell
+                    className="w-[160px] truncate"
+                    title={atleta.bloco_mfit || "-"}
+                    style={getColumnStyle("bloco_mfit")}
+                  >
                     {atleta.bloco_mfit || "-"}
                   </TableCell>
                   <TableCell
                     className="w-[160px]"
+                    style={getColumnStyle("status")}
                     onClick={(e) => {
                       e.stopPropagation();
                       setEditingCell({ id: atleta.id, field: "status" });
@@ -709,24 +981,54 @@ export function AtletasTable({
                       </button>
                     )}
                   </TableCell>
-                  <TableCell className="w-[160px] truncate" title={atleta.professor_nome || "-"}>
+                  <TableCell
+                    className="w-[160px] truncate"
+                    title={atleta.professor_nome || "-"}
+                    style={getColumnStyle("professor_nome")}
+                  >
                     {atleta.professor_nome || "-"}
                   </TableCell>
-                  <TableCell className="w-[160px] truncate" title={atleta.treinador_corrida_nome || "-"}>
+                  <TableCell
+                    className="w-[160px] truncate"
+                    title={atleta.treinador_corrida_nome || "-"}
+                    style={getColumnStyle("treinador_corrida_nome")}
+                  >
                     {atleta.treinador_corrida_nome || "-"}
                   </TableCell>
-                  <TableCell className="w-[120px] truncate" title={atleta.plano}>
+                  <TableCell
+                    className="w-[120px] truncate"
+                    title={atleta.plano}
+                    style={getColumnStyle("plano")}
+                  >
                     {atleta.plano}
                   </TableCell>
-                  <TableCell className="w-[130px] truncate">{atleta.ambiente}</TableCell>
-                  <TableCell className="w-[90px]">{atleta.dias_treina} dias</TableCell>
-                  <TableCell className="w-[160px] truncate" title={atleta.prova_alvo || "-"}>
+                  <TableCell
+                    className="w-[130px] truncate"
+                    style={getColumnStyle("ambiente")}
+                  >
+                    {atleta.ambiente}
+                  </TableCell>
+                  <TableCell className="w-[90px]" style={getColumnStyle("dias_treina")}>
+                    {atleta.dias_treina} dias
+                  </TableCell>
+                  <TableCell
+                    className="w-[160px] truncate"
+                    title={atleta.prova_alvo || "-"}
+                    style={getColumnStyle("prova_alvo")}
+                  >
                     {atleta.prova_alvo || "-"}
                   </TableCell>
-                  <TableCell className="w-[150px] truncate">
+                  <TableCell
+                    className="w-[150px] truncate"
+                    style={getColumnStyle("tempo_ate_prova")}
+                  >
                     {atleta.tempo_ate_prova || "Sem prova definida"}
                   </TableCell>
-                  <TableCell className="text-center w-[90px]" onClick={(e) => e.stopPropagation()}>
+                  <TableCell
+                    className="text-center w-[90px]"
+                    style={getColumnStyle("whatsapp")}
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <Button
                       variant="ghost"
                       size="icon"
@@ -751,7 +1053,10 @@ export function AtletasTable({
                       />
                     </Button>
                   </TableCell>
-                  <TableCell className="text-center w-[70px]">
+                  <TableCell
+                    className="text-center w-[70px]"
+                    style={getColumnStyle("conversa")}
+                  >
                     {atleta.conversou_semana ? (
                       <CheckCircle2
                         className="h-5 w-5 text-green-600 mx-auto"
