@@ -1,6 +1,6 @@
 "use client";
 
-import type { KeyboardEvent } from "react";
+import type { KeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
@@ -25,6 +25,8 @@ import {
   CheckCircle2,
   XCircle,
   ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
   Search,
   X,
   AlertTriangle,
@@ -110,6 +112,27 @@ const rowUrgencyStyles: Record<string, string> = {
   normal: "hover:bg-muted/50",
 };
 
+const defaultColumnWidths = {
+  select: 50,
+  nome: 220,
+  dias: 80,
+  pronto_ate: 130,
+  bloco_mfit: 160,
+  status: 160,
+  professor_nome: 160,
+  treinador_corrida_nome: 160,
+  plano: 120,
+  ambiente: 130,
+  dias_treina: 90,
+  prova_alvo: 160,
+  tempo_ate_prova: 150,
+  whatsapp: 90,
+  conversa: 70,
+} as const;
+
+type ColumnKey = keyof typeof defaultColumnWidths;
+const COLUMN_WIDTHS_STORAGE_KEY = "atletas-table-column-widths";
+
 // Componente para edição inline de status
 function InlineStatusSelect({
   value,
@@ -155,24 +178,9 @@ export function AtletasTable({
 }: AtletasTableProps) {
   const [sortField, setSortField] = useState<SortField>("dias");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-  const defaultColumnWidths = {
-    select: 50,
-    nome: 220,
-    dias: 80,
-    pronto_ate: 130,
-    bloco_mfit: 160,
-    status: 160,
-    professor_nome: 160,
-    treinador_corrida_nome: 160,
-    plano: 120,
-    ambiente: 130,
-    dias_treina: 90,
-    prova_alvo: 160,
-    tempo_ate_prova: 150,
-    whatsapp: 90,
-    conversa: 70,
-  } as const;
-  const [columnWidths, setColumnWidths] = useState<Record<keyof typeof defaultColumnWidths, number>>(defaultColumnWidths);
+  const [columnWidths, setColumnWidths] = useState<Record<ColumnKey, number>>(() => ({
+    ...defaultColumnWidths,
+  }));
   const [planos, setPlanos] = useState<string[]>([]);
   const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -181,6 +189,25 @@ export function AtletasTable({
   const [bulkAmbiente, setBulkAmbiente] = useState<Ambiente | "keep">("keep");
   const [bulkPlano, setBulkPlano] = useState<string | "keep">("keep");
   const [isApplyingBulk, setIsApplyingBulk] = useState(false);
+
+  useEffect(() => {
+    try {
+      const savedWidths = localStorage.getItem(COLUMN_WIDTHS_STORAGE_KEY);
+      if (savedWidths) {
+        const parsed = JSON.parse(savedWidths) as Partial<Record<ColumnKey, number>>;
+        setColumnWidths((prev) => ({
+          ...prev,
+          ...parsed,
+        }));
+      }
+    } catch (error) {
+      console.error("Não foi possível carregar larguras da tabela", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(COLUMN_WIDTHS_STORAGE_KEY, JSON.stringify(columnWidths));
+  }, [columnWidths]);
 
   useEffect(() => {
     setPlanos(getPlanos());
@@ -220,8 +247,8 @@ export function AtletasTable({
   };
 
   const startResizing = (
-    column: keyof typeof defaultColumnWidths,
-    event: React.MouseEvent<HTMLDivElement>
+    column: ColumnKey,
+    event: ReactMouseEvent<HTMLDivElement>
   ) => {
     event.preventDefault();
     event.stopPropagation();
@@ -245,10 +272,18 @@ export function AtletasTable({
     window.addEventListener("mouseup", handleMouseUp);
   };
 
-  const getColumnStyle = (column: keyof typeof defaultColumnWidths) => ({
+  const getColumnStyle = (column: ColumnKey) => ({
     width: `${columnWidths[column]}px`,
     minWidth: `${columnWidths[column]}px`,
   });
+
+  const renderResizeHandle = (column: ColumnKey) => (
+    <div
+      className="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none hover:bg-border/60"
+      onMouseDown={(event) => startResizing(column, event)}
+      aria-hidden="true"
+    />
+  );
 
   const sortedAtletas = useMemo(() => {
     return [...atletas].sort((a, b) => {
@@ -388,17 +423,27 @@ export function AtletasTable({
   }: {
     field: SortField;
     children: React.ReactNode;
-  }) => (
-    <Button
-      variant="ghost"
-      size="sm"
-      className="-ml-3 h-8 data-[state=open]:bg-accent"
-      onClick={() => handleSort(field)}
-    >
-      {children}
-      <ArrowUpDown className="ml-2 h-4 w-4" />
-    </Button>
-  );
+  }) => {
+    const isActive = sortField === field;
+    const Icon = !isActive
+      ? ArrowUpDown
+      : sortDirection === "asc"
+        ? ArrowUp
+        : ArrowDown;
+
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        className="-ml-3 h-8 data-[state=open]:bg-accent"
+        onClick={() => handleSort(field)}
+        aria-pressed={isActive}
+      >
+        {children}
+        <Icon className="ml-2 h-4 w-4" />
+      </Button>
+    );
+  };
 
   const clearFiltros = () => {
     onFiltrosChange({});
@@ -622,14 +667,11 @@ export function AtletasTable({
                   checked={allVisibleSelected}
                   ref={(el) => {
                     if (el) el.indeterminate = someVisibleSelected;
-                  }}
-                  onChange={toggleSelectAll}
-                  className="h-4 w-4 accent-primary"
-                />
-                <div
-                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
-                  onMouseDown={(event) => startResizing("select", event)}
-                />
+                }}
+                onChange={toggleSelectAll}
+                className="h-4 w-4 accent-primary"
+              />
+                {renderResizeHandle("select")}
               </TableHead>
               <TableHead
                 className="w-[220px] relative"
@@ -643,10 +685,7 @@ export function AtletasTable({
                 }
               >
                 <SortButton field="nome">Nome</SortButton>
-                <div
-                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
-                  onMouseDown={(event) => startResizing("nome", event)}
-                />
+                {renderResizeHandle("nome")}
               </TableHead>
               <TableHead
                 className="w-[80px] relative"
@@ -660,10 +699,7 @@ export function AtletasTable({
                 }
               >
                 <SortButton field="dias">Dias</SortButton>
-                <div
-                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
-                  onMouseDown={(event) => startResizing("dias", event)}
-                />
+                {renderResizeHandle("dias")}
               </TableHead>
               <TableHead
                 className="w-[130px] relative"
@@ -677,10 +713,7 @@ export function AtletasTable({
                 }
               >
                 <SortButton field="pronto_ate">Pronto até</SortButton>
-                <div
-                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
-                  onMouseDown={(event) => startResizing("pronto_ate", event)}
-                />
+                {renderResizeHandle("pronto_ate")}
               </TableHead>
               <TableHead
                 className="w-[160px] relative"
@@ -694,10 +727,7 @@ export function AtletasTable({
                 }
               >
                 <SortButton field="bloco_mfit">Bloco Mfit</SortButton>
-                <div
-                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
-                  onMouseDown={(event) => startResizing("bloco_mfit", event)}
-                />
+                {renderResizeHandle("bloco_mfit")}
               </TableHead>
               <TableHead
                 className="w-[160px] relative"
@@ -711,10 +741,7 @@ export function AtletasTable({
                 }
               >
                 <SortButton field="status">Status</SortButton>
-                <div
-                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
-                  onMouseDown={(event) => startResizing("status", event)}
-                />
+                {renderResizeHandle("status")}
               </TableHead>
               <TableHead
                 className="w-[160px] relative"
@@ -728,10 +755,7 @@ export function AtletasTable({
                 }
               >
                 <SortButton field="professor_nome">Professor</SortButton>
-                <div
-                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
-                  onMouseDown={(event) => startResizing("professor_nome", event)}
-                />
+                {renderResizeHandle("professor_nome")}
               </TableHead>
               <TableHead
                 className="w-[160px] relative"
@@ -747,10 +771,7 @@ export function AtletasTable({
                 <SortButton field="treinador_corrida_nome">
                   Treinador Corrida
                 </SortButton>
-                <div
-                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
-                  onMouseDown={(event) => startResizing("treinador_corrida_nome", event)}
-                />
+                {renderResizeHandle("treinador_corrida_nome")}
               </TableHead>
               <TableHead
                 className="w-[120px] relative"
@@ -764,10 +785,7 @@ export function AtletasTable({
                 }
               >
                 <SortButton field="plano">Plano</SortButton>
-                <div
-                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
-                  onMouseDown={(event) => startResizing("plano", event)}
-                />
+                {renderResizeHandle("plano")}
               </TableHead>
               <TableHead
                 className="w-[130px] relative"
@@ -781,10 +799,7 @@ export function AtletasTable({
                 }
               >
                 <SortButton field="ambiente">Ambiente</SortButton>
-                <div
-                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
-                  onMouseDown={(event) => startResizing("ambiente", event)}
-                />
+                {renderResizeHandle("ambiente")}
               </TableHead>
               <TableHead
                 className="w-[90px] relative"
@@ -798,10 +813,7 @@ export function AtletasTable({
                 }
               >
                 <SortButton field="dias_treina">Dias/Sem</SortButton>
-                <div
-                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
-                  onMouseDown={(event) => startResizing("dias_treina", event)}
-                />
+                {renderResizeHandle("dias_treina")}
               </TableHead>
               <TableHead
                 className="w-[160px] relative"
@@ -815,10 +827,7 @@ export function AtletasTable({
                 }
               >
                 <SortButton field="prova_alvo">Prova Alvo</SortButton>
-                <div
-                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
-                  onMouseDown={(event) => startResizing("prova_alvo", event)}
-                />
+                {renderResizeHandle("prova_alvo")}
               </TableHead>
               <TableHead
                 className="w-[150px] relative"
@@ -832,10 +841,7 @@ export function AtletasTable({
                 }
               >
                 <SortButton field="tempo_ate_prova">Tempo até Prova</SortButton>
-                <div
-                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
-                  onMouseDown={(event) => startResizing("tempo_ate_prova", event)}
-                />
+                {renderResizeHandle("tempo_ate_prova")}
               </TableHead>
               <TableHead
                 className="w-[90px] text-center relative"
@@ -849,10 +855,7 @@ export function AtletasTable({
                 }
               >
                 <SortButton field="whatsapp">WhatsApp</SortButton>
-                <div
-                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
-                  onMouseDown={(event) => startResizing("whatsapp", event)}
-                />
+                {renderResizeHandle("whatsapp")}
               </TableHead>
               <TableHead
                 className="w-[70px] text-center relative"
@@ -866,10 +869,7 @@ export function AtletasTable({
                 }
               >
                 <SortButton field="conversou_semana">Conversa</SortButton>
-                <div
-                  className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none"
-                  onMouseDown={(event) => startResizing("conversa", event)}
-                />
+                {renderResizeHandle("conversa")}
               </TableHead>
             </TableRow>
           </TableHeader>
