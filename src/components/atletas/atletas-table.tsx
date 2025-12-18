@@ -1,7 +1,7 @@
 "use client";
 
-import type { KeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   Table,
@@ -34,6 +34,7 @@ import {
   AlertCircle,
   Pencil,
   Check,
+  Undo2,
 } from "lucide-react";
 import { toast } from "sonner";
 import type {
@@ -132,6 +133,43 @@ const defaultColumnWidths = {
 
 type ColumnKey = keyof typeof defaultColumnWidths;
 const COLUMN_WIDTHS_STORAGE_KEY = "atletas-table-column-widths";
+type EditableField =
+  | "status"
+  | "pronto_ate"
+  | "bloco_mfit"
+  | "professor_id"
+  | "treinador_corrida_id"
+  | "plano"
+  | "ambiente"
+  | "dias_treina";
+
+type InlineHistoryEntry = {
+  atletaId: string;
+  field: EditableField;
+  previousValue: unknown;
+  newValue: unknown;
+};
+
+const MAX_HISTORY = 20;
+
+const toDateInputValue = (value?: string | null) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const tzOffset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - tzOffset).toISOString().slice(0, 10);
+};
+
+const toIsoDate = (value: string) => {
+  if (!value) return "";
+  return new Date(`${value}T00:00:00`).toISOString();
+};
+
+const InlineEditPopover = ({ children }: { children: React.ReactNode }) => (
+  <div className="relative z-10 flex w-full items-center gap-2 rounded-md border bg-background px-2 py-1 shadow-sm">
+    {children}
+  </div>
+);
 
 // Componente para edição inline de status
 function InlineStatusSelect({
@@ -182,13 +220,41 @@ export function AtletasTable({
     ...defaultColumnWidths,
   }));
   const [planos, setPlanos] = useState<string[]>([]);
-  const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
+  const [editingCell, setEditingCell] = useState<{ id: string; field: EditableField; value?: unknown } | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkProfessor, setBulkProfessor] = useState<string | "none" | "keep">("keep");
   const [bulkStatus, setBulkStatus] = useState<Status | "keep">("keep");
   const [bulkAmbiente, setBulkAmbiente] = useState<Ambiente | "keep">("keep");
   const [bulkPlano, setBulkPlano] = useState<string | "keep">("keep");
   const [isApplyingBulk, setIsApplyingBulk] = useState(false);
+  const [editHistory, setEditHistory] = useState<InlineHistoryEntry[]>([]);
+
+  const ensureColumnMinWidth = useCallback(
+    (column: ColumnKey, minWidth: number) => {
+      setColumnWidths((prev) =>
+        prev[column] >= minWidth ? prev : { ...prev, [column]: minWidth }
+      );
+    },
+    []
+  );
+
+  const undoLastChange = useCallback(async () => {
+    const lastChange = editHistory[editHistory.length - 1];
+    if (!lastChange) {
+      toast.info("Nada para desfazer.");
+      return;
+    }
+
+    setEditingCell(null);
+    setEditHistory((prev) => prev.slice(0, -1));
+    try {
+      await onUpdateAtleta(lastChange.atletaId, { [lastChange.field]: lastChange.previousValue });
+    } catch (error) {
+      console.error(error);
+      toast.error("Não foi possível desfazer a última alteração.");
+      setEditHistory((prev) => [...prev, lastChange]);
+    }
+  }, [editHistory, onUpdateAtleta]);
 
   useEffect(() => {
     try {
@@ -228,11 +294,49 @@ export function AtletasTable({
     setSelectedIds(new Set());
   }, [filtros]);
 
-  const handleInlineEdit = async (atletaId: string, field: string, value: unknown) => {
+  useEffect(() => {
+    const handleUndoShortcut = (event: KeyboardEvent) => {
+      const isUndoCombo = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z";
+      if (!isUndoCombo) return;
+
+      const target = event.target as HTMLElement | null;
+      if (target) {
+        const tagName = target.tagName;
+        if (tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT" || target.isContentEditable) {
+          return;
+        }
+      }
+
+      event.preventDefault();
+      undoLastChange();
+    };
+
+    window.addEventListener("keydown", handleUndoShortcut);
+    return () => window.removeEventListener("keydown", handleUndoShortcut);
+  }, [undoLastChange]);
+
+  const handleInlineEdit = async (
+    atletaId: string,
+    field: EditableField,
+    value: unknown,
+    previousValue?: unknown
+  ) => {
     try {
+      if (previousValue !== undefined && value === previousValue) {
+        setEditingCell(null);
+        return;
+      }
       await onUpdateAtleta(atletaId, { [field]: value });
-      setEditingCell(null);
+      if (previousValue !== undefined && value !== previousValue) {
+        setEditHistory((prev) => {
+          const next = [...prev, { atletaId, field, previousValue, newValue: value }];
+          if (next.length > MAX_HISTORY) next.shift();
+          return next;
+        });
+      }
     } catch {
+      // Toast já tratado no nível superior
+    } finally {
       setEditingCell(null);
     }
   };
@@ -284,6 +388,27 @@ export function AtletasTable({
       aria-hidden="true"
     />
   );
+
+  const handleInputKeyDown = (
+    event: ReactKeyboardEvent<HTMLInputElement>,
+    onSave: () => void,
+    onCancel: () => void
+  ) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      onSave();
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      onCancel();
+    }
+  };
+
+  const planoOptions = useMemo(() => {
+    const unique = new Set(planos);
+    atletas.forEach((atleta) => unique.add(atleta.plano));
+    return Array.from(unique);
+  }, [atletas, planos]);
 
   const sortedAtletas = useMemo(() => {
     return [...atletas].sort((a, b) => {
@@ -456,7 +581,7 @@ export function AtletasTable({
     filtros.plano ||
     filtros.ambiente;
 
-  const handleRowKeyDown = (atleta: AtletaComCalculos, event: KeyboardEvent<HTMLTableRowElement>) => {
+  const handleRowKeyDown = (atleta: AtletaComCalculos, event: ReactKeyboardEvent<HTMLTableRowElement>) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       onAtletaClick(atleta);
@@ -540,7 +665,7 @@ export function AtletasTable({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos os planos</SelectItem>
-            {planos.map((p) => (
+            {planoOptions.map((p) => (
               <SelectItem key={p} value={p}>
                 {p}
               </SelectItem>
@@ -576,6 +701,19 @@ export function AtletasTable({
             Limpar
           </Button>
         )}
+      </div>
+
+      <div className="flex items-center justify-end">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={undoLastChange}
+          disabled={editHistory.length === 0}
+          aria-label="Desfazer última alteração"
+        >
+          <Undo2 className="h-4 w-4 mr-2" />
+          Desfazer (Ctrl/Cmd + Z)
+        </Button>
       </div>
 
       {selectedIds.size > 0 && (
@@ -633,7 +771,7 @@ export function AtletasTable({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="keep">Não alterar</SelectItem>
-                {planos.map((p) => (
+                {planoOptions.map((p) => (
                   <SelectItem key={p} value={p}>
                     {p}
                   </SelectItem>
@@ -935,34 +1073,197 @@ export function AtletasTable({
                     </span>
                   </TableCell>
                   <TableCell
-                    className="w-[130px]"
+                    className="relative w-[130px] overflow-visible"
                     style={getColumnStyle("pronto_ate")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      ensureColumnMinWidth("pronto_ate", 180);
+                      setEditingCell({ id: atleta.id, field: "pronto_ate", value: toDateInputValue(atleta.pronto_ate) });
+                    }}
                   >
-                    {atleta.pronto_ate
-                      ? new Date(atleta.pronto_ate).toLocaleDateString("pt-BR")
-                      : "-"}
+                    {editingCell?.id === atleta.id && editingCell?.field === "pronto_ate" ? (
+                      <InlineEditPopover>
+                        <div className="flex w-full items-center gap-3">
+                          <Input
+                            type="date"
+                            value={(editingCell?.value as string) || ""}
+                            onChange={(event) =>
+                              setEditingCell((prev) =>
+                                prev ? { ...prev, value: event.target.value } : prev
+                              )
+                            }
+                            onClick={(event) => event.stopPropagation()}
+                            onKeyDown={(event) =>
+                              handleInputKeyDown(
+                                event,
+                                () =>
+                                  handleInlineEdit(
+                                    atleta.id,
+                                    "pronto_ate",
+                                    toIsoDate(String(editingCell?.value || "")),
+                                    atleta.pronto_ate
+                                  ),
+                                () => setEditingCell(null)
+                              )
+                            }
+                            autoFocus
+                            className="h-9 w-full max-w-[220px]"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleInlineEdit(
+                                atleta.id,
+                                "pronto_ate",
+                                toIsoDate(String(editingCell?.value || "")),
+                                atleta.pronto_ate
+                              );
+                            }}
+                            aria-label="Salvar data"
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setEditingCell(null);
+                            }}
+                            aria-label="Cancelar edição"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </InlineEditPopover>
+                    ) : (
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 group"
+                        aria-label={`Editar data de ${atleta.nome}`}
+                      >
+                        {atleta.pronto_ate
+                          ? new Date(atleta.pronto_ate).toLocaleDateString("pt-BR")
+                          : "-"}
+                        <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </button>
+                    )}
                   </TableCell>
                   <TableCell
-                    className="w-[160px] truncate"
-                    title={atleta.bloco_mfit || "-"}
+                    className="relative w-[160px] truncate overflow-visible"
+                    title={
+                      editingCell?.id === atleta.id && editingCell?.field === "bloco_mfit"
+                        ? undefined
+                        : atleta.bloco_mfit || "-"
+                    }
                     style={getColumnStyle("bloco_mfit")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      ensureColumnMinWidth("bloco_mfit", 260);
+                      setEditingCell({ id: atleta.id, field: "bloco_mfit", value: atleta.bloco_mfit || "" });
+                    }}
                   >
-                    {atleta.bloco_mfit || "-"}
+                    {editingCell?.id === atleta.id && editingCell?.field === "bloco_mfit" ? (
+                      <InlineEditPopover>
+                        <Input
+                          value={(editingCell?.value as string) ?? ""}
+                          onChange={(event) =>
+                            setEditingCell((prev) =>
+                              prev ? { ...prev, value: event.target.value } : prev
+                            )
+                          }
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) =>
+                            handleInputKeyDown(
+                              event,
+                              () =>
+                                handleInlineEdit(
+                                  atleta.id,
+                                  "bloco_mfit",
+                                  String(editingCell?.value ?? ""),
+                                  atleta.bloco_mfit
+                                ),
+                              () => setEditingCell(null)
+                            )
+                          }
+                          autoFocus
+                          className="h-9 w-full max-w-[360px]"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleInlineEdit(
+                              atleta.id,
+                              "bloco_mfit",
+                              String(editingCell?.value ?? ""),
+                              atleta.bloco_mfit
+                            );
+                          }}
+                          aria-label="Salvar bloco MFit"
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setEditingCell(null);
+                          }}
+                          aria-label="Cancelar edição"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </InlineEditPopover>
+                    ) : (
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 group w-full text-left"
+                        aria-label={`Editar bloco MFit de ${atleta.nome}`}
+                        title={atleta.bloco_mfit || "-"}
+                      >
+                        <span className="truncate">{atleta.bloco_mfit || "-"}</span>
+                        <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                      </button>
+                    )}
                   </TableCell>
                   <TableCell
-                    className="w-[160px]"
+                    className="relative w-[160px] overflow-visible"
                     style={getColumnStyle("status")}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setEditingCell({ id: atleta.id, field: "status" });
+                      ensureColumnMinWidth("status", 200);
+                      setEditingCell({ id: atleta.id, field: "status", value: atleta.status });
                     }}
                   >
-                    {editingCell?.id === atleta.id && editingCell?.field === "status" ? (
+                {editingCell?.id === atleta.id && editingCell?.field === "status" ? (
+                    <InlineEditPopover>
                       <InlineStatusSelect
                         value={atleta.status}
-                        onChange={(v) => handleInlineEdit(atleta.id, "status", v)}
+                        onChange={(v) => handleInlineEdit(atleta.id, "status", v, atleta.status)}
                         onCancel={() => setEditingCell(null)}
                       />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setEditingCell(null);
+                        }}
+                        aria-label="Fechar"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </InlineEditPopover>
                     ) : (
                       <button
                         type="button"
@@ -982,34 +1283,315 @@ export function AtletasTable({
                     )}
                   </TableCell>
                   <TableCell
-                    className="w-[160px] truncate"
-                    title={atleta.professor_nome || "-"}
+                    className="relative w-[160px] truncate overflow-visible"
+                    title={
+                      editingCell?.id === atleta.id && editingCell?.field === "professor_id"
+                        ? undefined
+                        : atleta.professor_nome || "-"
+                    }
                     style={getColumnStyle("professor_nome")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      ensureColumnMinWidth("professor_nome", 220);
+                      setEditingCell({ id: atleta.id, field: "professor_id", value: atleta.professor_id || "none" });
+                    }}
                   >
-                    {atleta.professor_nome || "-"}
+                    {editingCell?.id === atleta.id && editingCell?.field === "professor_id" ? (
+                      <InlineEditPopover>
+                        <Select
+                          value={(editingCell?.value as string) || "none"}
+                          onValueChange={(value) =>
+                            handleInlineEdit(
+                              atleta.id,
+                              "professor_id",
+                              value === "none" ? null : value,
+                              atleta.professor_id
+                            )
+                          }
+                          defaultOpen
+                          onOpenChange={(open) => {
+                            if (!open) setEditingCell(null);
+                          }}
+                        >
+                          <SelectTrigger className="h-9 w-full min-w-[200px] text-sm">
+                            <SelectValue placeholder="Professor" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Sem professor</SelectItem>
+                            {treinadores.map((t) => (
+                              <SelectItem key={t.id} value={t.id}>
+                                {t.nome}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setEditingCell(null);
+                          }}
+                          aria-label="Fechar"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </InlineEditPopover>
+                    ) : (
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 group w-full text-left"
+                        aria-label={`Editar professor de ${atleta.nome}`}
+                        title={atleta.professor_nome || "-"}
+                      >
+                        <span className="truncate">{atleta.professor_nome || "-"}</span>
+                        <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                      </button>
+                    )}
                   </TableCell>
                   <TableCell
-                    className="w-[160px] truncate"
-                    title={atleta.treinador_corrida_nome || "-"}
+                    className="relative w-[160px] truncate overflow-visible"
+                    title={
+                      editingCell?.id === atleta.id && editingCell?.field === "treinador_corrida_id"
+                        ? undefined
+                        : atleta.treinador_corrida_nome || "-"
+                    }
                     style={getColumnStyle("treinador_corrida_nome")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      ensureColumnMinWidth("treinador_corrida_nome", 220);
+                      setEditingCell({
+                        id: atleta.id,
+                        field: "treinador_corrida_id",
+                        value: atleta.treinador_corrida_id || "none",
+                      });
+                    }}
                   >
-                    {atleta.treinador_corrida_nome || "-"}
+                    {editingCell?.id === atleta.id && editingCell?.field === "treinador_corrida_id" ? (
+                      <InlineEditPopover>
+                        <Select
+                          value={(editingCell?.value as string) || "none"}
+                          onValueChange={(value) =>
+                            handleInlineEdit(
+                              atleta.id,
+                              "treinador_corrida_id",
+                              value === "none" ? null : value,
+                              atleta.treinador_corrida_id
+                            )
+                          }
+                          defaultOpen
+                          onOpenChange={(open) => {
+                            if (!open) setEditingCell(null);
+                          }}
+                        >
+                          <SelectTrigger className="h-9 w-full min-w-[200px] text-sm">
+                            <SelectValue placeholder="Treinador corrida" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Sem treinador</SelectItem>
+                            {treinadores.map((t) => (
+                              <SelectItem key={t.id} value={t.id}>
+                                {t.nome}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setEditingCell(null);
+                          }}
+                          aria-label="Fechar"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </InlineEditPopover>
+                    ) : (
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 group w-full text-left"
+                        aria-label={`Editar treinador de corrida de ${atleta.nome}`}
+                        title={atleta.treinador_corrida_nome || "-"}
+                      >
+                        <span className="truncate">{atleta.treinador_corrida_nome || "-"}</span>
+                        <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                      </button>
+                    )}
                   </TableCell>
                   <TableCell
-                    className="w-[120px] truncate"
-                    title={atleta.plano}
+                    className="relative w-[120px] truncate overflow-visible"
+                    title={editingCell?.id === atleta.id && editingCell?.field === "plano" ? undefined : atleta.plano}
                     style={getColumnStyle("plano")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      ensureColumnMinWidth("plano", 200);
+                      setEditingCell({ id: atleta.id, field: "plano", value: atleta.plano });
+                    }}
                   >
-                    {atleta.plano}
+                    {editingCell?.id === atleta.id && editingCell?.field === "plano" ? (
+                      <InlineEditPopover>
+                        <Select
+                          value={(editingCell?.value as string) || atleta.plano}
+                          onValueChange={(value) =>
+                            handleInlineEdit(atleta.id, "plano", value, atleta.plano)
+                          }
+                          defaultOpen
+                          onOpenChange={(open) => {
+                            if (!open) setEditingCell(null);
+                          }}
+                        >
+                          <SelectTrigger className="h-9 w-full min-w-[200px] text-sm">
+                            <SelectValue placeholder="Plano" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {planoOptions.map((p) => (
+                              <SelectItem key={p} value={p}>
+                                {p}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setEditingCell(null);
+                          }}
+                          aria-label="Fechar"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </InlineEditPopover>
+                    ) : (
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 group w-full text-left"
+                        aria-label={`Editar plano de ${atleta.nome}`}
+                        title={atleta.plano}
+                      >
+                        <span className="truncate">{atleta.plano}</span>
+                        <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                      </button>
+                    )}
                   </TableCell>
                   <TableCell
-                    className="w-[130px] truncate"
+                    className="relative w-[130px] truncate overflow-visible"
+                    title={editingCell?.id === atleta.id && editingCell?.field === "ambiente" ? undefined : atleta.ambiente}
                     style={getColumnStyle("ambiente")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      ensureColumnMinWidth("ambiente", 200);
+                      setEditingCell({ id: atleta.id, field: "ambiente", value: atleta.ambiente });
+                    }}
                   >
-                    {atleta.ambiente}
+                    {editingCell?.id === atleta.id && editingCell?.field === "ambiente" ? (
+                      <InlineEditPopover>
+                        <Select
+                          value={(editingCell?.value as Ambiente) || atleta.ambiente}
+                          onValueChange={(value) =>
+                            handleInlineEdit(atleta.id, "ambiente", value as Ambiente, atleta.ambiente)
+                          }
+                          defaultOpen
+                          onOpenChange={(open) => {
+                            if (!open) setEditingCell(null);
+                          }}
+                        >
+                          <SelectTrigger className="h-9 w-full min-w-[200px] text-sm">
+                            <SelectValue placeholder="Ambiente" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {AMBIENTE_OPTIONS.map((a) => (
+                              <SelectItem key={a.value} value={a.value}>
+                                {a.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setEditingCell(null);
+                          }}
+                          aria-label="Fechar"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </InlineEditPopover>
+                    ) : (
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 group w-full text-left"
+                        aria-label={`Editar ambiente de ${atleta.nome}`}
+                      >
+                        <span className="truncate">{atleta.ambiente}</span>
+                        <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                      </button>
+                    )}
                   </TableCell>
-                  <TableCell className="w-[90px]" style={getColumnStyle("dias_treina")}>
-                    {atleta.dias_treina} dias
+                  <TableCell
+                    className="relative w-[90px] overflow-visible"
+                    style={getColumnStyle("dias_treina")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      ensureColumnMinWidth("dias_treina", 180);
+                      setEditingCell({ id: atleta.id, field: "dias_treina", value: String(atleta.dias_treina) });
+                    }}
+                  >
+                    {editingCell?.id === atleta.id && editingCell?.field === "dias_treina" ? (
+                      <InlineEditPopover>
+                        <Select
+                          value={(editingCell?.value as string) || String(atleta.dias_treina)}
+                          onValueChange={(value) =>
+                            handleInlineEdit(atleta.id, "dias_treina", Number(value), atleta.dias_treina)
+                          }
+                          defaultOpen
+                          onOpenChange={(open) => {
+                            if (!open) setEditingCell(null);
+                          }}
+                        >
+                          <SelectTrigger className="h-9 w-full min-w-[180px] text-sm">
+                            <SelectValue placeholder="Dias/semana" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {DIAS_TREINA_OPTIONS.map((option) => (
+                              <SelectItem key={option.value} value={String(option.value)}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setEditingCell(null);
+                          }}
+                          aria-label="Fechar"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </InlineEditPopover>
+                    ) : (
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 group w-full text-left"
+                        aria-label={`Editar dias de treino de ${atleta.nome}`}
+                      >
+                        <span className="truncate">{atleta.dias_treina} dias</span>
+                        <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                      </button>
+                    )}
                   </TableCell>
                   <TableCell
                     className="w-[160px] truncate"
