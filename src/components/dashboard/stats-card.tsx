@@ -9,7 +9,9 @@ interface StatsCardProps {
   value: number;
   icon: LucideIcon;
   variant?: "default" | "warning" | "danger" | "success";
+  size?: "default" | "large";
   onClick?: () => void;
+  percentage?: number;
 }
 
 const variantStyles = {
@@ -33,28 +35,55 @@ const valueStyles = {
   success: "text-green-700",
 };
 
+const sizeStyles = {
+  default: {
+    card: "",
+    icon: "h-4 w-4",
+    value: "text-3xl",
+    title: "text-sm",
+  },
+  large: {
+    card: "md:col-span-2 border-2",
+    icon: "h-6 w-6",
+    value: "text-4xl md:text-5xl",
+    title: "text-base",
+  },
+};
+
 export function StatsCard({
   title,
   value,
   icon: Icon,
   variant = "default",
+  size = "default",
   onClick,
+  percentage,
 }: StatsCardProps) {
   return (
     <Card
       className={cn(
         variantStyles[variant],
+        sizeStyles[size].card,
         onClick && "cursor-pointer hover:shadow-md transition-shadow"
       )}
       onClick={onClick}
     >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className={cn("h-4 w-4", iconStyles[variant])} />
+        <CardTitle className={cn(sizeStyles[size].title, "font-medium")}>
+          {title}
+        </CardTitle>
+        <Icon className={cn(sizeStyles[size].icon, iconStyles[variant])} />
       </CardHeader>
       <CardContent>
-        <div className={cn("text-3xl font-bold", valueStyles[variant])}>
-          {value}
+        <div className="flex items-baseline gap-2">
+          <div className={cn(sizeStyles[size].value, "font-bold", valueStyles[variant])}>
+            {value}
+          </div>
+          {percentage !== undefined && (
+            <span className="text-sm text-muted-foreground font-medium">
+              ({percentage}%)
+            </span>
+          )}
         </div>
       </CardContent>
     </Card>

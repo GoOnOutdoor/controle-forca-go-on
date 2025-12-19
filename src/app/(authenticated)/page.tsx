@@ -577,7 +577,11 @@ export default function HomePage() {
             </div>
           </div>
 
-          <Dashboard stats={dashboardStats} onFilterClick={handleFilterClick} />
+          <Dashboard
+            stats={dashboardStats}
+            onFilterClick={handleFilterClick}
+            totalAtletas={atletasVisiveis.length}
+          />
 
           <div>
             <h2 className="text-xl font-semibold mb-4">Lista de Atletas</h2>

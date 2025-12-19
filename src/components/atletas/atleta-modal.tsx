@@ -179,19 +179,76 @@ export function AtletaModal({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl w-[calc(100vw-2rem)] sm:w-auto max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl">{atleta.nome}</DialogTitle>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <DialogTitle className="text-xl">{atleta.nome}</DialogTitle>
+              <div className="flex items-center gap-2 mt-2">
+                <Badge
+                  variant={
+                    atleta.status === "treino_montado"
+                      ? "success"
+                      : atleta.status === "atrasado"
+                        ? "destructive"
+                        : atleta.status === "precisa_ajuste"
+                          ? "warning"
+                          : "outline"
+                  }
+                >
+                  {atleta.status === "treino_montado"
+                    ? "Montado"
+                    : atleta.status === "atrasado"
+                      ? "Atrasado"
+                      : atleta.status === "precisa_ajuste"
+                        ? "Ajuste"
+                        : "Aguardando"}
+                </Badge>
+                <Badge
+                  variant={
+                    atleta.dias < 0
+                      ? "destructive"
+                      : atleta.dias <= 7
+                        ? "warning"
+                        : "success"
+                  }
+                >
+                  {atleta.dias} dias
+                </Badge>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onOpenWhatsapp(atleta)}
+                disabled={!atleta.telefone}
+              >
+                <Image
+                  src="/icons/whatsapp.svg"
+                  alt="WhatsApp"
+                  width={16}
+                  height={16}
+                  className="mr-2"
+                />
+                WhatsApp
+              </Button>
+              <Button variant="outline" size="sm" onClick={onRegistrarConversa}>
+                <Clock className="h-4 w-4 mr-2" />
+                Registrar Conversa
+              </Button>
+            </div>
+          </div>
         </DialogHeader>
 
-        <div className="grid gap-3">
+        {/* Seções sempre abertas - 2 colunas no desktop */}
+        <div className="grid md:grid-cols-2 gap-4 pb-4 border-b">
           {/* Dados básicos */}
-          <CollapsibleSection
-            title="Dados Básicos"
-            icon={User}
-            isOpen={openSections.basico}
-            onToggle={() => toggleSection("basico")}
-          >
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="sm:col-span-2">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b">
+              <User className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold">Dados Básicos</h3>
+            </div>
+            <div className="space-y-3">
+              <div>
                 <Label>Telefone (WhatsApp)</Label>
                 <Input
                   type="tel"
@@ -245,42 +302,44 @@ export function AtletaModal({
                 </Select>
               </div>
 
-              <div>
-                <Label>Plano</Label>
-                <Select
-                  value={formData.plano}
-                  onValueChange={(v) => handleChange("plano", v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {planos.map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {p}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Plano</Label>
+                  <Select
+                    value={formData.plano}
+                    onValueChange={(v) => handleChange("plano", v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {planos.map((p) => (
+                        <SelectItem key={p} value={p}>
+                          {p}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div>
-                <Label>Ambiente</Label>
-                <Select
-                  value={formData.ambiente}
-                  onValueChange={(v) => handleChange("ambiente", v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {AMBIENTE_OPTIONS.map((a) => (
-                      <SelectItem key={a.value} value={a.value}>
-                        {a.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div>
+                  <Label>Ambiente</Label>
+                  <Select
+                    value={formData.ambiente}
+                    onValueChange={(v) => handleChange("ambiente", v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {AMBIENTE_OPTIONS.map((a) => (
+                        <SelectItem key={a.value} value={a.value}>
+                          {a.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div>
@@ -302,30 +361,15 @@ export function AtletaModal({
                 </Select>
               </div>
             </div>
-          </CollapsibleSection>
+          </div>
 
           {/* Treino atual */}
-          <CollapsibleSection
-            title="Treino Atual"
-            icon={Calendar}
-              isOpen={openSections.treino}
-              onToggle={() => toggleSection("treino")}
-              badge={
-                <Badge
-                  variant={
-                  atleta.dias < 0
-                    ? "destructive"
-                    : atleta.dias <= 7
-                      ? "warning"
-                      : "success"
-                }
-                className="ml-2"
-              >
-                {atleta.dias} dias
-              </Badge>
-            }
-          >
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b">
+              <Calendar className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold">Treino Atual</h3>
+            </div>
+            <div className="space-y-3">
               <div>
                 <Label>Status</Label>
                 <Select
@@ -383,7 +427,11 @@ export function AtletaModal({
                 </div>
               </div>
             </div>
-          </CollapsibleSection>
+          </div>
+        </div>
+
+        {/* Seções colapsáveis */}
+        <div className="grid gap-3">
 
           {/* Prova alvo */}
           <CollapsibleSection
@@ -611,35 +659,9 @@ export function AtletaModal({
               )
             }
           >
-            <div className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="secondary"
-                  onClick={() => onOpenWhatsapp(atleta)}
-                  disabled={!atleta.telefone}
-                >
-                  <Image
-                    src="/icons/whatsapp.svg"
-                    alt="WhatsApp"
-                    width={18}
-                    height={18}
-                    className="mr-2"
-                  />
-                  Abrir WhatsApp
-                </Button>
-                <Button onClick={onRegistrarConversa}>
-                  <Clock className="h-4 w-4 mr-2" />
-                  Registrar Conversa
-                </Button>
-              </div>
-              {!atleta.telefone && (
-                <p className="text-sm text-muted-foreground">
-                  Adicione um telefone para habilitar o WhatsApp.
-                </p>
-              )}
-
+            <div className="space-y-3">
               {logConversas.length > 0 ? (
-                <div className="space-y-1 max-h-32 overflow-y-auto">
+                <div className="space-y-1 max-h-48 overflow-y-auto">
                   {logConversas
                     .sort(
                       (a, b) =>
@@ -649,18 +671,18 @@ export function AtletaModal({
                     .map((log) => (
                       <div
                         key={log.id}
-                        className="flex justify-between text-sm py-1 border-b last:border-0"
+                        className="flex justify-between text-sm py-2 border-b last:border-0"
                       >
-                        <span>{getTreinadorNome(log.treinador_id)}</span>
-                        <span className="text-muted-foreground">
+                        <span className="font-medium">{getTreinadorNome(log.treinador_id)}</span>
+                        <span className="text-muted-foreground text-xs">
                           {new Date(log.created_at).toLocaleString("pt-BR")}
                         </span>
                       </div>
                     ))}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">
-                  Nenhuma conversa registrada.
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Nenhuma conversa registrada ainda.
                 </p>
               )}
             </div>
