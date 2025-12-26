@@ -4,6 +4,7 @@ import type {
   Treinador,
   HandoffNote,
   LogConversa,
+  Lembrete,
   DashboardStats,
   AtletaComCalculos,
 } from "@/types";
@@ -63,8 +64,11 @@ async function postApi<T>(
 // ATLETAS
 // ============================================
 
-export async function getAtletas(): Promise<Atleta[]> {
-  return fetchApi<Atleta[]>("getAtletas");
+export async function getAtletas(mostrarInativos = false): Promise<Atleta[]> {
+  return fetchApi<Atleta[]>(
+    "getAtletas",
+    mostrarInativos ? { mostrar_inativos: "true" } : undefined
+  );
 }
 
 export async function getAtleta(id: string): Promise<Atleta | null> {
@@ -86,6 +90,18 @@ export async function updateAtleta(
 
 export async function deleteAtleta(id: string): Promise<void> {
   await postApi("deleteAtleta", { id });
+}
+
+// Sprint 11: Inativar Atleta
+export async function inativarAtleta(
+  id: string,
+  motivo: string
+): Promise<Atleta> {
+  return postApi<Atleta>("inativarAtleta", { id, motivo });
+}
+
+export async function reativarAtleta(id: string): Promise<Atleta> {
+  return postApi<Atleta>("reativarAtleta", { id });
 }
 
 // ============================================
@@ -152,6 +168,34 @@ export async function createLogConversa(
 }
 
 // ============================================
+// LEMBRETES (Sprint 12)
+// ============================================
+
+export async function getLembretes(atletaId?: string): Promise<Lembrete[]> {
+  return fetchApi<Lembrete[]>(
+    "getLembretes",
+    atletaId ? { atleta_id: atletaId } : undefined
+  );
+}
+
+export async function createLembrete(
+  data: Omit<Lembrete, "id" | "created_at" | "updated_at" | "realizado" | "data_realizado">
+): Promise<Lembrete> {
+  return postApi<Lembrete>("createLembrete", { data });
+}
+
+export async function updateLembrete(
+  id: string,
+  data: Partial<Lembrete>
+): Promise<Lembrete> {
+  return postApi<Lembrete>("updateLembrete", { id, data });
+}
+
+export async function marcarLembreteRealizado(id: string): Promise<Lembrete> {
+  return postApi<Lembrete>("marcarLembreteRealizado", { id });
+}
+
+// ============================================
 // DASHBOARD
 // ============================================
 
@@ -204,13 +248,25 @@ export function calcularTempoAteProva(dataProva: string | null): string | null {
 export function processarAtletasComCalculos(
   atletas: Atleta[],
   treinadores: Treinador[],
-  logConversas: LogConversa[]
+  logConversas: LogConversa[],
+  lembretes: Lembrete[] = []
 ): AtletaComCalculos[] {
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
 
   const umaSemanaAtras = new Date(hoje);
   umaSemanaAtras.setDate(umaSemanaAtras.getDate() - 7);
+
+  // Calcular início e fim da semana (SEGUNDA a DOMINGO) - Sprint 12
+  const diaSemana = hoje.getDay(); // 0=domingo, 1=segunda, ..., 6=sábado
+  const diasAteSegunda = diaSemana === 0 ? -6 : 1 - diaSemana;
+  const inicioSemana = new Date(hoje);
+  inicioSemana.setDate(hoje.getDate() + diasAteSegunda);
+  inicioSemana.setHours(0, 0, 0, 0);
+
+  const fimSemana = new Date(inicioSemana);
+  fimSemana.setDate(inicioSemana.getDate() + 6);
+  fimSemana.setHours(23, 59, 59, 999);
 
   const calcularStatusAutomatico = (atleta: Atleta, dias: number | null): Atleta["status"] => {
     const original = atleta.status;
@@ -239,6 +295,14 @@ export function processarAtletasComCalculos(
       return dataLog >= umaSemanaAtras;
     });
 
+    // Filtrar lembretes ativos desta semana (SEGUNDA a DOMINGO) - Sprint 12
+    const lembretesAtivos = lembretes.filter((l) => {
+      if (l.atleta_id !== atleta.id) return false;
+      if (l.realizado) return false;
+      const dataLembrete = new Date(l.data_lembrete);
+      return dataLembrete >= inicioSemana && dataLembrete <= fimSemana;
+    });
+
     const dias = calcularDias(atleta.pronto_ate) ?? 0;
     const statusCalculado = calcularStatusAutomatico(atleta, dias);
 
@@ -251,6 +315,9 @@ export function processarAtletasComCalculos(
       professor_nome: professor?.nome || null,
       treinador_corrida_nome: treinadorCorrida?.nome || null,
       conversou_semana: conversouSemana,
+      // Sprint 12: Lembretes
+      tem_lembrete_ativo: lembretesAtivos.length > 0,
+      lembretes_ativos: lembretesAtivos,
     };
   });
 }

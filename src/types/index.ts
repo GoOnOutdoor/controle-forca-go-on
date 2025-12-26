@@ -53,6 +53,12 @@ export interface Atleta {
   observacao: string;
   created_at: string;
   updated_at: string;
+  // Sprint 11: Inativar Atleta
+  ativo: boolean;
+  data_inativacao: string | null;
+  motivo_inativacao: string;
+  // Sprint 13: Campo de Ajuste
+  nota_ajuste: string;
 }
 
 export interface HandoffNote {
@@ -70,6 +76,19 @@ export interface LogConversa {
   created_at: string;
 }
 
+// Sprint 12: Sistema de Lembretes
+export interface Lembrete {
+  id: string;
+  atleta_id: string;
+  treinador_id: string;
+  conteudo: string;
+  data_lembrete: string; // ISO date string
+  realizado: boolean;
+  data_realizado: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // Tipos derivados para a UI
 export interface AtletaComCalculos extends Atleta {
   dias: number; // calculado: diferença entre pronto_ate e hoje
@@ -78,6 +97,9 @@ export interface AtletaComCalculos extends Atleta {
   treinador_corrida_nome: string | null;
   conversou_semana: boolean;
   status_original?: Status;
+  // Sprint 12: Lembretes
+  tem_lembrete_ativo: boolean;
+  lembretes_ativos: Lembrete[];
 }
 
 export interface DashboardStats {
@@ -88,6 +110,8 @@ export interface DashboardStats {
   atrasados: number;
   precisam_ajuste: number;
   sem_conversa_semana: number;
+  // Sprint 11: Inativar Atleta
+  inativos: number;
 }
 
 // Tipos para filtros
@@ -109,6 +133,8 @@ export interface FiltrosAtleta {
   dias_treina?: DiasTreina;
   busca?: string;
   especial?: FiltroEspecial;
+  // Sprint 11: Inativar Atleta
+  mostrar_inativos?: boolean;
 }
 
 // Constantes para selects
